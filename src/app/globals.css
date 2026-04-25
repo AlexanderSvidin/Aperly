@@ -49,7 +49,7 @@ select {
   margin: 0 auto;
   max-width: var(--max-content-width);
   min-height: 100vh;
-  padding: 20px 16px 104px;
+  padding: 20px 16px calc(156px + env(safe-area-inset-bottom, 0px));
 }
 
 .mobile-shell {
@@ -847,10 +847,12 @@ select {
   border: 1px solid var(--surface-border);
   background: rgba(252, 250, 245, 0.96);
   box-shadow: 0 -8px 24px rgba(25, 33, 43, 0.08);
+  z-index: 20;
 }
 
 .shell-nav-link {
   display: flex;
+  min-width: 0;
   min-height: 44px;
   align-items: center;
   justify-content: center;
@@ -859,6 +861,7 @@ select {
   font-size: 0.78rem;
   font-weight: 700;
   text-align: center;
+  white-space: nowrap;
 }
 
 .shell-nav-link[data-active="true"] {

@@ -144,7 +144,7 @@ async function assertRequestActorEligibility(actor: RequestActor) {
   if (actor.status !== "ACTIVE") {
     throw new RequestDomainError({
       code: "request_actor_forbidden",
-      message: "�������� � �������������� �������� ���������� ��� ����� ��������.",
+      message: "Профиль и онбординг обязательны для создания запроса.",
       status: 403
     });
   }
@@ -152,7 +152,7 @@ async function assertRequestActorEligibility(actor: RequestActor) {
   if (!actor.onboardingCompleted) {
     throw new RequestDomainError({
       code: "request_onboarding_required",
-      message: "������� ��������� ���������� �������.",
+      message: "Сначала завершите онбординг профиля.",
       status: 409
     });
   }
@@ -189,7 +189,7 @@ async function assertNoActiveScenarioDuplicate(
     throw new RequestDomainError({
       code: "request_active_duplicate",
       message:
-        "� ��� ��� ���� �������� ������ ����� ��������. �������� ��� ��� ������� �����������.",
+        "У вас уже есть активный запрос этого сценария. Измените его или сначала архивируйте.",
       status: 409,
       meta: {
         requestId: duplicate.id
@@ -287,7 +287,7 @@ async function replaceScenarioDetails(
   const subjectId = resolvedSubjectIds[0];
 
   if (!subjectId) {
-    throw new Error("�������� ������� ��� ������� ���� �������.");
+    throw new Error("Выберите предмет для учебного запроса.");
   }
 
   const subjectCount = await transaction.subject.count({
@@ -299,7 +299,7 @@ async function replaceScenarioDetails(
   });
 
   if (subjectCount !== 1) {
-    throw new Error("������� ��� ���������� ����� �� ������.");
+    throw new Error("Предмет для совместной учёбы не найден.");
   }
 
   await transaction.studyRequestDetails.create({
@@ -415,7 +415,7 @@ export const requestService: RequestService = {
     if (!request) {
       throw new RequestDomainError({
         code: "request_not_found",
-        message: "������ �� ������.",
+        message: "Запрос не найден.",
         status: 404
       });
     }
@@ -469,7 +469,7 @@ export const requestService: RequestService = {
     if (!existingRequest) {
       throw new RequestDomainError({
         code: "request_not_found",
-        message: "������ �� ������.",
+        message: "Запрос не найден.",
         status: 404
       });
     }
@@ -478,7 +478,7 @@ export const requestService: RequestService = {
       throw new RequestDomainError({
         code: "request_not_editable",
         message:
-          "�������� ����� ������ �������� ������. ��� �������� ������� ����������� ���������.",
+          "Изменять можно только активный запрос. Для старого запроса используйте возобновление.",
         status: 409
       });
     }
@@ -488,7 +488,7 @@ export const requestService: RequestService = {
     if (input.scenario !== existingRequest.scenario) {
       throw new RequestDomainError({
         code: "request_scenario_locked",
-        message: "������ ������ �������� ������������� �������.",
+        message: "Запрос другого сценария редактировать нельзя.",
         status: 409
       });
     }
@@ -530,7 +530,7 @@ export const requestService: RequestService = {
     if (!existingRequest) {
       throw new RequestDomainError({
         code: "request_not_found",
-        message: "������ �� ������.",
+        message: "Запрос не найден.",
         status: 404
       });
     }
@@ -571,7 +571,7 @@ export const requestService: RequestService = {
     if (!existingRequest) {
       throw new RequestDomainError({
         code: "request_not_found",
-        message: "������ �� ������.",
+        message: "Запрос не найден.",
         status: 404
       });
     }

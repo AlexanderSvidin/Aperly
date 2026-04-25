@@ -73,11 +73,11 @@ function formatProfileMeta(match: SerializedMatchListItem) {
   const parts = [
     match.candidateProfile.program,
     match.candidateProfile.courseYear
-      ? `${match.candidateProfile.courseYear} ����`
+      ? `${match.candidateProfile.courseYear} курс`
       : null
   ].filter(Boolean);
 
-  return parts.length > 0 ? parts.join(", ") : "������� �������� ������";
+  return parts.length > 0 ? parts.join(", ") : "Профиль пока без данных";
 }
 
 function renderInfoChips(values: string[], limit: number) {
@@ -127,7 +127,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
       if (!response.ok) {
         setFeedback({
           kind: "error",
-          message: result?.message ?? "�� ������� �������� �������."
+          message: result?.message ?? "Не удалось обновить подбор."
         });
         return;
       }
@@ -136,8 +136,8 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
         kind: "success",
         message:
           typeof result?.matchCount === "number"
-            ? `������� ���������: ${result.matchCount} ����������.`
-            : "������� ���������."
+            ? `Подбор обновлён: ${result.matchCount} совпадений.`
+            : "Подбор обновлён."
       });
 
       router.refresh();
@@ -192,12 +192,11 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
     <div className="screen-stack">
       <section className="surface-card screen-stack">
         <div className="screen-copy">
-          <p className="card-eyebrow">������</p>
-          <h2 className="screen-title">������� �� �������� ��������</h2>
+          <p className="card-eyebrow">Подбор</p>
+          <h2 className="screen-title">Матчи по активным запросам</h2>
           <p className="screen-description">
-            Aperly ������� ���� ���������� ����� ���������, � �������� ������ ��
-            �������� �������� ���������� ������ �����, ����� ���������� ��������
-            ������� ����.
+            Aperly сравнивает ваши запросы с запросами других студентов, а при
+            малом пуле показывает подходящие открытые профили.
           </p>
         </div>
 
@@ -216,8 +215,8 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
         {initialData.requests.length === 0 ? (
           <div className="screen-stack">
             <p className="screen-description">
-              �������� �������� ���� ���. ������� �������� ������, ����� ��������
-              ����������������� ������.
+              Активных запросов пока нет. Создайте короткий запрос, чтобы
+              получить первые рекомендации.
             </p>
             <Link
               className={buttonClassName({
@@ -225,7 +224,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
               })}
               href="/requests/new"
             >
-              ������� ������
+              Создать запрос
             </Link>
           </div>
         ) : (
@@ -253,16 +252,16 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                       {requestStatusLabels[request.status]}
                     </span>
                     <span className="score-pill">
-                      {request.activeMatchCount} ����.
+                      {request.activeMatchCount} мэтч.
                     </span>
                   </div>
                 </div>
 
                 <p className="helper-text">
-                  �� {formatRequestDate(request.expiresAt)}
+                  До {formatRequestDate(request.expiresAt)}
                   {request.lastMatchedAt
-                    ? ` � ��������� ${formatRequestDate(request.lastMatchedAt)}`
-                    : " � ��� �� ���������������"}
+                    ? ` • обновлено ${formatRequestDate(request.lastMatchedAt)}`
+                    : " • ещё не пересчитывался"}
                 </p>
               </Link>
             ))}
@@ -282,13 +281,13 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                   {requestStatusLabels[selectedCollection.requestStatus]}
                 </span>
                 {selectedCollection.fallbackUsed ? (
-                  <span className="status-pill">���� �������� ������</span>
+                  <span className="status-pill">Резервный подбор</span>
                 ) : null}
               </div>
               <h2 className="screen-title">{selectedCollection.requestTitle}</h2>
               <p className="screen-description">
-                {scenarioLabelByValue[selectedCollection.requestScenario]} �
-                ��������� �� {formatRequestDate(selectedCollection.requestExpiresAt)}
+                {scenarioLabelByValue[selectedCollection.requestScenario]} •
+                активен до {formatRequestDate(selectedCollection.requestExpiresAt)}
               </p>
             </div>
 
@@ -301,7 +300,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                 onClick={handleRefresh}
                 variant="secondary"
               >
-                {isPending ? "���������..." : "�������� �������"}
+                {isPending ? "Обновляем..." : "Обновить подбор"}
               </Button>
               <Link
                 className={buttonClassName({
@@ -310,7 +309,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                 })}
                 href="/requests/new"
               >
-                ��������� ��������
+                Изменить запрос
               </Link>
             </div>
           </div>
@@ -319,7 +318,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
             <div className="screen-stack">
               {selectedCollection.emptyState.keepRequestOpen ? (
                 <span className="tone-pill" data-tone="warning">
-                  ������ ������� ��������
+                  Запрос остаётся активным
                 </span>
               ) : null}
               <div className="screen-copy">
@@ -340,7 +339,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                     onClick={handleRefresh}
                     variant="secondary"
                   >
-                    �������� �����
+                    Найти снова
                   </Button>
                 ) : null}
                 <Link
@@ -349,7 +348,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                   })}
                   href="/profile"
                 >
-                  �������� �������
+                  Улучшить профиль
                 </Link>
               </div>
             </div>
@@ -388,7 +387,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                             : buildMatchesHref(selectedCollection.requestId, match.id)
                         }
                       >
-                        {isSelected ? "������ ������" : "���������"}
+                        {isSelected ? "Скрыть детали" : "Подробнее"}
                       </Link>
                     </div>
 
@@ -404,10 +403,10 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                           {match.candidateRequest.subtitle}
                         </p>
                         <p className="helper-text">
-                          ������:{" "}
+                          Формат:{" "}
                           {match.candidateRequest.preferredFormat
                             ? formatLabelByValue[match.candidateRequest.preferredFormat]
-                            : "�� ������"}
+                            : "не указан"}
                         </p>
                       </div>
                     ) : null}
@@ -423,10 +422,10 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                       </div>
                       {match.candidateProfile.availabilityLabels.length > 0 ? (
                         <p className="helper-text">
-                          �����:{" "}
+                          Время:{" "}
                           {match.candidateProfile.availabilityLabels
                             .slice(0, 2)
-                            .join(" � ")}
+                            .join(" • ")}
                         </p>
                       ) : null}
                       <p className="helper-text">
@@ -444,7 +443,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
       {selectedMatch && selectedCollection ? (
         <section className="surface-card screen-stack">
           <div className="screen-copy">
-            <p className="card-eyebrow">������ �����</p>
+            <p className="card-eyebrow">Детали мэтча</p>
             <h2 className="screen-title">{selectedMatch.candidateProfile.fullName}</h2>
             <p className="screen-description">{selectedMatch.reasonSummary}</p>
           </div>
@@ -460,19 +459,19 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
             </div>
           ) : (
             <p className="helper-text">
-              ��� ����� ����� �������� ������ ������� ���������� ������� ���
-              ����������� ���������.
+              Для этого мэтча пока нет детализации по критериям. Обновите
+              подбор или откройте профиль кандидата.
             </p>
           )}
 
           <div className="match-context-card">
-            <p className="card-eyebrow">��������� ���</p>
+            <p className="card-eyebrow">Следующий шаг</p>
             <p className="feedback-title">
               {chatReadinessLabels[selectedMatch.chatReadiness]}
             </p>
             <p className="card-body-copy">
-              ���� ���� ��������� ���������� ����������. ��� � ����� ����������
-              ����� ���������� ��������, ��� ������������� ������ �������.
+              Контакты пока скрыты. Сначала откройте чат и договоритесь о
+              сотрудничестве, затем обменяйтесь контактами по взаимному согласию.
             </p>
           </div>
 
@@ -491,7 +490,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
               })}
               href={buildMatchesHref(selectedCollection.requestId)}
             >
-              ��������� � ������
+              Вернуться к списку
             </Link>
             <Link
               className={buttonClassName({
@@ -499,7 +498,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
               })}
               href="/profile"
             >
-              �������� �������
+              Улучшить профиль
             </Link>
           </div>
         </section>

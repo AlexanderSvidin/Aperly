@@ -212,7 +212,7 @@ function buildPersonDisplayName(input: {
   return (
     input.fullName ||
     [input.firstName, input.lastName].filter(Boolean).join(" ").trim() ||
-    "������������"
+    "Неизвестно"
   );
 }
 
@@ -575,10 +575,10 @@ function buildRequestCard(request: MatchRequestRecord): SerializedMatchRequestCa
       id: request.id,
       scenario: request.scenario,
       title: request.caseDetails.eventName,
-      subtitle: `����� ����: ${
+      subtitle: `нужные роли: ${
         request.caseDetails.neededRoles
           .map((role) => roleLabelByValue[role] ?? role)
-          .join(", ") || "����������"
+          .join(", ") || "не указаны"
       }`,
       preferredFormat: request.caseDetails.preferredFormat,
       expiresAt: request.expiresAt.toISOString(),
@@ -598,7 +598,7 @@ function buildRequestCard(request: MatchRequestRecord): SerializedMatchRequestCa
       subtitle: `${
         projectStageLabelByValue[request.projectDetails.stage] ??
         request.projectDetails.stage
-      } � ${
+      } • ${
         commitmentLabelByValue[request.projectDetails.expectedCommitment] ??
         request.projectDetails.expectedCommitment
       }`,
@@ -615,12 +615,12 @@ function buildRequestCard(request: MatchRequestRecord): SerializedMatchRequestCa
   return {
     id: request.id,
     scenario: request.scenario,
-    title: request.studyDetails?.subject.name ?? "���������� �����",
+    title: request.studyDetails?.subject.name ?? "Совместная учёба",
     subtitle: `${
       studyFrequencyLabelByValue[
         (request.studyDetails?.desiredFrequency ?? "FLEXIBLE") as keyof typeof studyFrequencyLabelByValue
       ] ?? request.studyDetails?.desiredFrequency ?? "FLEXIBLE"
-    } � ${
+    } • ${
       preferredTimeLabelByValue[
         (request.studyDetails?.preferredTime ?? "FLEXIBLE") as keyof typeof preferredTimeLabelByValue
       ] ?? request.studyDetails?.preferredTime ?? "FLEXIBLE"
@@ -711,7 +711,7 @@ function buildReasonSummary(
     return topLabels[0];
   }
 
-  return `${topLabels[0]} � ${topLabels[1].toLowerCase()}`;
+  return `${topLabels[0]} • ${topLabels[1].toLowerCase()}`;
 }
 
 function attachSummaryLabels(
@@ -777,43 +777,43 @@ function scoreCaseRequestPair(
   const drafts: MatchDimensionDraft[] = [
     {
       key: "role_fit",
-      label: "���� � ������",
-      summaryLabel: "�������� �� �����",
+      label: "Роли и навыки",
+      summaryLabel: "подходит по ролям",
       weight: 30,
       value: roleFit
     },
     {
       key: "event_relevance",
-      label: "������������� �������",
-      summaryLabel: "��������� ���� ��� �������",
+      label: "Релевантность кейса",
+      summaryLabel: "похожий кейс или чемпионат",
       weight: 25,
       value: eventFit
     },
     {
       key: "availability_overlap",
-      label: "����������� �� �������",
-      summaryLabel: "��������� �����",
+      label: "Совпадение по времени",
+      summaryLabel: "похожее время",
       weight: 15,
       value: availabilityFit
     },
     {
       key: "skill_fit",
-      label: "��������� �����������",
-      summaryLabel: "��������� ������",
+      label: "Общие компетенции",
+      summaryLabel: "похожие навыки",
       weight: 15,
       value: skillFit
     },
     {
       key: "format_fit",
-      label: "������������� �������",
-      summaryLabel: "�������� ������",
+      label: "Предпочитаемый формат",
+      summaryLabel: "подходит формат",
       weight: 10,
       value: formatFit
     },
     {
       key: "profile_completeness",
-      label: "������������� �������",
-      summaryLabel: "������� ������ ��������",
+      label: "Заполненность профиля",
+      summaryLabel: "хорошо заполнен профиль",
       weight: 5,
       value: completeness
     }
@@ -822,7 +822,7 @@ function scoreCaseRequestPair(
   const finalized = finalizeDimensions(drafts);
   const reasonSummary = buildReasonSummary(
     attachSummaryLabels(finalized.dimensions, drafts),
-    ["���� ������� ������������� �� �����"]
+    ["есть базовое совпадение по кейсу"]
   );
 
   return {
@@ -884,43 +884,43 @@ function scoreProjectRequestPair(
   const drafts: MatchDimensionDraft[] = [
     {
       key: "role_fit",
-      label: "���� � ������",
-      summaryLabel: "�������� �� �����",
+      label: "Роли и навыки",
+      summaryLabel: "подходит по ролям",
       weight: 30,
       value: roleFit
     },
     {
       key: "stage_fit",
-      label: "������������� ������",
-      summaryLabel: "�������� ������ �������",
+      label: "Совместимость стадии",
+      summaryLabel: "близкая стадия проекта",
       weight: 20,
       value: stageFit
     },
     {
       key: "commitment_fit",
-      label: "������������� �������������",
-      summaryLabel: "��������� ��������� �������������",
+      label: "Ожидаемая вовлечённость",
+      summaryLabel: "похожие ожидания по нагрузке",
       weight: 15,
       value: commitmentFit
     },
     {
       key: "format_fit",
-      label: "������������� �������",
-      summaryLabel: "�������� ������",
+      label: "Предпочитаемый формат",
+      summaryLabel: "подходит формат",
       weight: 15,
       value: formatFit
     },
     {
       key: "skill_fit",
-      label: "��������� �����������",
-      summaryLabel: "��������� ������",
+      label: "Общие компетенции",
+      summaryLabel: "похожие навыки",
       weight: 15,
       value: skillFit
     },
     {
       key: "profile_completeness",
-      label: "������������� �������",
-      summaryLabel: "������� ������ ��������",
+      label: "Заполненность профиля",
+      summaryLabel: "хорошо заполнен профиль",
       weight: 5,
       value: completeness
     }
@@ -929,7 +929,7 @@ function scoreProjectRequestPair(
   const finalized = finalizeDimensions(drafts);
   const reasonSummary = buildReasonSummary(
     attachSummaryLabels(finalized.dimensions, drafts),
-    ["���� ������� ������������� �� �������"]
+    ["есть базовое совпадение по проекту"]
   );
 
   return {
@@ -999,43 +999,43 @@ function scoreStudyRequestPair(
   const drafts: MatchDimensionDraft[] = [
     {
       key: "subject_fit",
-      label: "���������� ��������",
-      summaryLabel: "��������� �������",
+      label: "Совпадение предмета",
+      summaryLabel: "одинаковый предмет",
       weight: 35,
       value: subjectFit
     },
     {
       key: "goal_fit",
-      label: "�������� ������� ����",
-      summaryLabel: "������� ������� ����",
+      label: "Близкая учебная цель",
+      summaryLabel: "похожая учебная цель",
       weight: 20,
       value: goalFit
     },
     {
       key: "availability_overlap",
-      label: "����������� �� �������",
-      summaryLabel: "��������� �����",
+      label: "Совпадение по времени",
+      summaryLabel: "похожее время",
       weight: 15,
       value: availabilityFit
     },
     {
       key: "format_fit",
-      label: "������������� �������",
-      summaryLabel: "�������� ������",
+      label: "Предпочитаемый формат",
+      summaryLabel: "подходит формат",
       weight: 10,
       value: formatFit
     },
     {
       key: "rhythm_fit",
-      label: "������������� �����",
-      summaryLabel: "�������� ���� �������",
+      label: "Совместимый ритм",
+      summaryLabel: "подходит ритм занятий",
       weight: 15,
       value: rhythmFit
     },
     {
       key: "profile_completeness",
-      label: "������������� �������",
-      summaryLabel: "������� ������ ��������",
+      label: "Заполненность профиля",
+      summaryLabel: "хорошо заполнен профиль",
       weight: 5,
       value: completeness
     }
@@ -1044,7 +1044,7 @@ function scoreStudyRequestPair(
   const finalized = finalizeDimensions(drafts);
   const reasonSummary = buildReasonSummary(
     attachSummaryLabels(finalized.dimensions, drafts),
-    ["���� ������� ������������� ��� ���������� �����"]
+    ["есть базовое совпадение для совместной учёбы"]
   );
 
   return {
@@ -1096,29 +1096,29 @@ function scoreFallbackCandidate(
     const drafts: MatchDimensionDraft[] = [
       {
         key: "subject_fit",
-        label: "���������� ��������",
-        summaryLabel: "��������� �������",
+        label: "Совпадение предмета",
+        summaryLabel: "одинаковый предмет",
         weight: 45,
         value: subjectFit
       },
       {
         key: "availability_overlap",
-        label: "����������� �� �������",
-        summaryLabel: "��������� �����",
+        label: "Совпадение по времени",
+        summaryLabel: "похожее время",
         weight: 20,
         value: availabilityFit
       },
       {
         key: "format_fit",
-        label: "������������� �������",
-        summaryLabel: "�������� ������",
+        label: "Предпочитаемый формат",
+        summaryLabel: "подходит формат",
         weight: 15,
         value: formatFit
       },
       {
         key: "profile_completeness",
-        label: "������������� �������",
-        summaryLabel: "������� ������ ��������",
+        label: "Заполненность профиля",
+        summaryLabel: "хорошо заполнен профиль",
         weight: 20,
         value: completeness
       }
@@ -1127,7 +1127,7 @@ function scoreFallbackCandidate(
     const finalized = finalizeDimensions(drafts);
     const reasonSummary = buildReasonSummary(
       attachSummaryLabels(finalized.dimensions, drafts),
-      ["���� ������� ������������� ��� ���������� �����"]
+      ["есть базовое совпадение для совместной учёбы"]
     );
 
     return {
@@ -1146,43 +1146,43 @@ function scoreFallbackCandidate(
       ? [
           {
             key: "role_fit",
-            label: "���� � ������",
-            summaryLabel: "�������� �� �����",
+            label: "Роли и навыки",
+            summaryLabel: "подходит по ролям",
             weight: 35,
             value: roleFit
           },
           {
             key: "skill_fit",
-            label: "��������� �����������",
-            summaryLabel: "��������� ������",
+            label: "Общие компетенции",
+            summaryLabel: "похожие навыки",
             weight: 20,
             value: skillFit
           },
           {
             key: "availability_overlap",
-            label: "����������� �� �������",
-            summaryLabel: "��������� �����",
+            label: "Совпадение по времени",
+            summaryLabel: "похожее время",
             weight: 15,
             value: availabilityFit
           },
           {
             key: "format_fit",
-            label: "������������� �������",
-            summaryLabel: "�������� ������",
+            label: "Предпочитаемый формат",
+            summaryLabel: "подходит формат",
             weight: 15,
             value: formatFit
           },
           {
             key: "subject_fit",
-            label: "����������� �� ���������",
-            summaryLabel: "���� ����� ���������� ����",
+            label: "Совпадение по предметам",
+            summaryLabel: "есть общие учебные темы",
             weight: 5,
             value: subjectFit
           },
           {
             key: "profile_completeness",
-            label: "������������� �������",
-            summaryLabel: "������� ������ ��������",
+            label: "Заполненность профиля",
+            summaryLabel: "хорошо заполнен профиль",
             weight: 10,
             value: completeness
           }
@@ -1190,43 +1190,43 @@ function scoreFallbackCandidate(
       : [
           {
             key: "role_fit",
-            label: "���� � ������",
-            summaryLabel: "�������� �� �����",
+            label: "Роли и навыки",
+            summaryLabel: "подходит по ролям",
             weight: 30,
             value: roleFit
           },
           {
             key: "skill_fit",
-            label: "��������� �����������",
-            summaryLabel: "��������� ������",
+            label: "Общие компетенции",
+            summaryLabel: "похожие навыки",
             weight: 20,
             value: skillFit
           },
           {
             key: "availability_overlap",
-            label: "����������� �� �������",
-            summaryLabel: "��������� �����",
+            label: "Совпадение по времени",
+            summaryLabel: "похожее время",
             weight: 10,
             value: availabilityFit
           },
           {
             key: "format_fit",
-            label: "������������� �������",
-            summaryLabel: "�������� ������",
+            label: "Предпочитаемый формат",
+            summaryLabel: "подходит формат",
             weight: 15,
             value: formatFit
           },
           {
             key: "subject_fit",
-            label: "����������� �� ���������",
-            summaryLabel: "���� ����� ���������� ����",
+            label: "Совпадение по предметам",
+            summaryLabel: "есть общие учебные темы",
             weight: 10,
             value: subjectFit
           },
           {
             key: "profile_completeness",
-            label: "������������� �������",
-            summaryLabel: "������� ������ ��������",
+            label: "Заполненность профиля",
+            summaryLabel: "хорошо заполнен профиль",
             weight: 15,
             value: completeness
           }
@@ -1235,7 +1235,7 @@ function scoreFallbackCandidate(
   const finalized = finalizeDimensions(drafts);
   const reasonSummary = buildReasonSummary(
     attachSummaryLabels(finalized.dimensions, drafts),
-    ["���� ������� ������������� �� �������"]
+    ["есть базовое совпадение по профилю"]
   );
 
   return {
@@ -1383,12 +1383,12 @@ function buildRequestEmptyState(
   if (request.status !== "ACTIVE" || request.expiresAt <= new Date()) {
     return {
       code: "REQUEST_INACTIVE",
-      title: "������� ��� ����� ������� ������ ����������",
-      description: "�������� ������ ��� �������� �����, ����� ����� �������� ���������� ����������.",
+      title: "Пока нет подходящих совпадений",
+      description: "Оставьте запрос активным или уточните профиль, чтобы подбор стал точнее.",
       suggestions: [
-        "�������� ������, ���� ���� �� ��� ���������.",
-        "��������� ����, ������� ��� ������ ����� ��������� ��������.",
-        "����� renew ������� ������������� ������."
+        "Добавьте навыки, роли или предметы в профиль.",
+        "Уточните формат, дедлайн или удобное время.",
+        "Позже обновите запрос, чтобы пересчитать подбор."
       ],
       keepRequestOpen: false
     };
@@ -1396,15 +1396,15 @@ function buildRequestEmptyState(
 
   return {
     code: "NO_MATCHES",
-    title: "���������� ���������� ���� ���",
+    title: "Подходящих запросов пока мало",
     description:
-      "������ ������� ��������. ����� �������� ��� ��������, �������� ��������� ��� ��������� ����� � �������� �������� �������.",
+      "Запрос остаётся активным. Можно подождать новых участников, обновить профиль или включить больше деталей в описание.",
     suggestions: [
-      "�������� ����, �������, ���� ��� ������� �����.",
+      "Добавьте роли, навыки или удобное время.",
       isDiscoverable
-        ? "��������� �������: ������, �������� � ��������� ����� ������ �� ��������."
-        : "� ������� ����� ������� ����� ������� ��� ��������� ������.",
-      "�������� ������ �������� � ���������� �������� ������ �����."
+        ? "Проверьте профиль: навыки, предметы и доступное время влияют на подбор."
+        : "В ближайшие дни можно вручную обновить подбор.",
+      "Сохраните запрос активным и вернитесь к матчам позже."
     ],
     keepRequestOpen: true
   };
@@ -2092,7 +2092,7 @@ export const matchingService: MatchingService = {
     if (!request) {
       throw new MatchingDomainError({
         code: "match_request_not_found",
-        message: "������ ��� ������� �� ������.",
+        message: "Запрос для подбора не найден.",
         status: 404
       });
     }
@@ -2100,7 +2100,7 @@ export const matchingService: MatchingService = {
     if (request.status !== "ACTIVE") {
       throw new MatchingDomainError({
         code: "match_refresh_not_allowed",
-        message: "��������� ������� ����� ������ ��� ��������� �������.",
+        message: "Обновите страницу перед повторным действием.",
         status: 409
       });
     }
@@ -2125,7 +2125,7 @@ export const matchingService: MatchingService = {
     if (!request) {
       throw new MatchingDomainError({
         code: "match_request_not_found",
-        message: "������ ��� ������� �� ������.",
+        message: "Запрос для подбора не найден.",
         status: 404
       });
     }
@@ -2198,7 +2198,7 @@ export const matchingService: MatchingService = {
     if (!match) {
       throw new MatchingDomainError({
         code: "match_not_found",
-        message: "���� �� ������.",
+        message: "Матч не найден.",
         status: 404
       });
     }
@@ -2217,7 +2217,7 @@ export const matchingService: MatchingService = {
     if (!canAccess) {
       throw new MatchingDomainError({
         code: "match_forbidden",
-        message: "���� ���� ����������.",
+        message: "Матч уже обработан.",
         status: 403
       });
     }
@@ -2228,7 +2228,7 @@ export const matchingService: MatchingService = {
     if (!serialized) {
       throw new MatchingDomainError({
         code: "match_not_found",
-        message: "���� ����������.",
+        message: "Матч отклонён.",
         status: 404
       });
     }

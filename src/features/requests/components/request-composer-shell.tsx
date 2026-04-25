@@ -284,26 +284,26 @@ function findOptionLabel(
 
 function describeRequest(request: SerializedRequest) {
   if (request.details.type === "CASE") {
-    return `������ ����: ${request.details.neededRoles.length}, ������ ${findOptionLabel(
+    return `нужно ролей: ${request.details.neededRoles.length}, формат ${findOptionLabel(
       requestFormatOptions,
       request.details.preferredFormat
     ).toLowerCase()}`;
   }
 
   if (request.details.type === "PROJECT") {
-    return `������ ${findOptionLabel(
+    return `стадия ${findOptionLabel(
       projectStageOptions,
       request.details.stage
-    ).toLowerCase()}, ������ ${findOptionLabel(
+    ).toLowerCase()}, формат ${findOptionLabel(
       requestFormatOptions,
       request.details.preferredFormat
     ).toLowerCase()}`;
   }
 
-  return `������� ${findOptionLabel(
+  return `ритм ${findOptionLabel(
     studyFrequencyOptions,
     request.details.desiredFrequency
-  ).toLowerCase()}, ����� ${findOptionLabel(
+  ).toLowerCase()}, время ${findOptionLabel(
     preferredTimeOptions,
     request.details.preferredTime
   ).toLowerCase()}`;
@@ -481,7 +481,7 @@ export function RequestComposerShell({
     if (!draft) {
       setFeedback({
         kind: "error",
-        message: "������� �������� ��������."
+        message: "Сначала выберите сценарий."
       });
       return;
     }
@@ -566,7 +566,7 @@ export function RequestComposerShell({
 
         setFeedback({
           kind: "error",
-          message: result?.message ?? "�� ������� ��������� ������.",
+          message: result?.message ?? "Не удалось сохранить запрос.",
           issues: extractIssueMessages(result)
         });
         return;
@@ -582,8 +582,8 @@ export function RequestComposerShell({
         kind: "success",
         message:
           result.request.status === "ACTIVE"
-            ? "������ �������. ������ ����� ������� �� ������ ����������."
-            : "������ �������."
+            ? "Запрос сохранён. Новые матчи появятся после обновления."
+            : "Запрос сохранён."
       });
     });
   }
@@ -606,7 +606,7 @@ export function RequestComposerShell({
       if (!response.ok || !result?.request) {
         setFeedback({
           kind: "error",
-          message: result?.message ?? "�� ������� ������������ ������."
+          message: result?.message ?? "Не удалось архивировать запрос."
         });
         return;
       }
@@ -622,7 +622,7 @@ export function RequestComposerShell({
 
       setFeedback({
         kind: "success",
-        message: "������ �����������."
+        message: "Запрос архивирован."
       });
     });
   }
@@ -645,7 +645,7 @@ export function RequestComposerShell({
       if (!response.ok || !result?.request) {
         setFeedback({
           kind: "error",
-          message: result?.message ?? "�� ������� �������� ������."
+          message: result?.message ?? "Не удалось обновить запрос."
         });
         return;
       }
@@ -657,7 +657,7 @@ export function RequestComposerShell({
       setEditingRequestId(result.request.id);
       setFeedback({
         kind: "success",
-        message: "������ ����� �������."
+        message: "Запрос снова активен."
       });
     });
   }
@@ -672,10 +672,10 @@ export function RequestComposerShell({
   return (
     <section className="screen-stack">
       <div className="screen-copy">
-        <h1 className="screen-title">�������</h1>
+        <h1 className="screen-title">Создать</h1>
         <p className="screen-description">
-          ���� �������� � ���� �������� ������. ��������, ��� �� ����� ������,
-          � ��������� �������� ����� ��� ������ �����.
+          Один активный запрос на каждый сценарий. Выберите, кого вы хотите
+          найти, и заполните короткую форму.
         </p>
       </div>
 
@@ -684,19 +684,19 @@ export function RequestComposerShell({
           const request = latestRequestsByScenario.get(scenario.value);
 
           return (
-            <Card key={scenario.value} eyebrow="��������" title={scenario.label}>
+            <Card key={scenario.value} eyebrow="Сценарий" title={scenario.label}>
               <div className="screen-stack">
                 <span
                   className="tone-pill"
                   data-tone={request ? requestStatusTone[request.status] : "neutral"}
                 >
-                  {request ? requestStatusLabels[request.status] : "������� ��� ���"}
+                  {request ? requestStatusLabels[request.status] : "запроса ещё нет"}
                 </span>
 
                 <p className="card-body-copy">
                   {request
                     ? summarizeRequest(request)
-                    : "������� �������� �������� � �������� ������ ������."}
+                    : "Создайте короткий запрос и получите первые матчи."}
                 </p>
 
                 {request ? (
@@ -716,7 +716,7 @@ export function RequestComposerShell({
                     }}
                     variant={request?.status === "ACTIVE" ? "secondary" : "primary"}
                   >
-                    {request?.status === "ACTIVE" ? "�������������" : "������� �����"}
+                    {request?.status === "ACTIVE" ? "Редактировать" : "Создать запрос"}
                   </Button>
 
                   {request?.status === "ACTIVE" ? (
@@ -725,7 +725,7 @@ export function RequestComposerShell({
                       onClick={() => handleArchive(request.id)}
                       variant="ghost"
                     >
-                      ������������
+                      Архивировать
                     </Button>
                   ) : null}
 
@@ -735,7 +735,7 @@ export function RequestComposerShell({
                       onClick={() => handleRenew(request.id)}
                       variant="secondary"
                     >
-                      ��������
+                      Возобновить
                     </Button>
                   ) : null}
                 </div>
@@ -745,10 +745,10 @@ export function RequestComposerShell({
         })}
       </div>
 
-      <Card eyebrow="�����" title="������� ��� �������� ������">
+      <Card eyebrow="Форма" title="Данные для подбора">
         <form className="profile-form" onSubmit={handleSubmit}>
           <div className="field-stack">
-            <span className="field-label">��� �� �����</span>
+            <span className="field-label">Что вы ищете</span>
             <div className="toggle-grid">
               {requestScenarioOptions.map((scenario) => (
                 <button
@@ -787,18 +787,18 @@ export function RequestComposerShell({
             <p className="helper-text">
               {selectedScenario
                 ? activeForSelectedScenario
-                  ? "��� ����� �������� ��� ���� �������� ������. �� ������������ ��� ������ �������� �����."
+                  ? "У вас уже есть активный запрос для этого сценария. Мы обновим его вместо создания нового."
                   : latestForSelectedScenario
-                    ? `��������� ������ ����� �������� ������ � ������� �${requestStatusLabels[latestForSelectedScenario.status]}�.`
-                    : "����� ���������� ������ ��������� �������� �� ������������ ����� ��������."
-                : "������� �������� ��������. ��� ����� �������, ���� ������ ����� ������: �������, ���������� ������� ��� ������� ��� ���������� �����."}
+                    ? `Последний запрос сейчас имеет статус «${requestStatusLabels[latestForSelectedScenario.status]}».`
+                    : "Можно заполнить новый запрос и сразу перейти к подбору."
+                : "Выберите сценарий подбора. Это помогает системе понять, что именно искать: команду, партнёров проекта или партнёра для совместной учёбы."}
             </p>
           </div>
 
           {!draft ? null : draft.scenario === "CASE" ? (
             <>
               <label className="field-stack">
-                <span className="field-label">�������� ����� ��� ��������</span>
+                <span className="field-label">Название кейса или чемпионата</span>
                 <input
                   className="field-input"
                   onChange={(event) =>
@@ -810,7 +810,7 @@ export function RequestComposerShell({
                       }
                     })
                   }
-                  placeholder="��������, ����-��������� ����� 2026"
+                  placeholder="Например, кейс-чемпионат банка 2026"
                   required
                   value={draft.details.eventName}
                 />
@@ -818,7 +818,7 @@ export function RequestComposerShell({
 
               <div className="form-grid">
                 <label className="field-stack">
-                  <span className="field-label">�������, ���� ��������</span>
+                  <span className="field-label">Дедлайн, если известен</span>
                   <input
                     className="field-input"
                     onChange={(event) =>
@@ -836,7 +836,7 @@ export function RequestComposerShell({
                 </label>
 
                 <label className="field-stack">
-                  <span className="field-label">������� ������� �� �������</span>
+                  <span className="field-label">Сколько людей не хватает</span>
                   <input
                     className="field-input"
                     max={8}
@@ -857,7 +857,7 @@ export function RequestComposerShell({
               </div>
 
               <div className="field-stack">
-                <span className="field-label">������ ����</span>
+                <span className="field-label">Нужные роли</span>
                 <div className="toggle-grid">
                   {collaborationRoleOptions.map((role) => (
                     <button
@@ -882,7 +882,7 @@ export function RequestComposerShell({
               </div>
 
               <div className="field-stack">
-                <span className="field-label">���������������� ������</span>
+                <span className="field-label">Предпочтительный формат</span>
                 <div className="toggle-grid toggle-grid-compact">
                   {requestFormatOptions.map((format) => (
                     <button
@@ -907,17 +907,17 @@ export function RequestComposerShell({
               </div>
 
               <div className="field-stack">
-                <span className="field-label">����� ������ ����������</span>
+                <span className="field-label">Когда удобно готовиться</span>
                 <p className="helper-text">
-                  ���� ���� � ��� ���� ���� ������ � ���������� �������. ���
-                  ����� ����� ����� � ������� �������� ����������.
+                  Эти окна нужны для подбора людей с похожим расписанием. Для
+                  кейса можно указать несколько удобных слотов.
                 </p>
                 <div className="availability-stack">
                   {draft.availabilitySlots.map((slot) => (
                     <div key={slot.id} className="availability-row availability-slot-card">
                       <div className="avail-day-row">
                         <label className="field-stack availability-field">
-                          <span className="field-caption">����</span>
+                          <span className="field-caption">День</span>
                           <select
                             className="field-input field-select"
                             onChange={(event) =>
@@ -941,15 +941,15 @@ export function RequestComposerShell({
                           type="button"
                           variant="ghost"
                         >
-                          ������
+                          Удалить
                         </Button>
                       </div>
 
                       <div className="avail-time-row">
                         <label className="field-stack availability-field">
-                          <span className="field-caption">�</span>
+                          <span className="field-caption">С</span>
                           <input
-                            aria-label="����� ������ ����������"
+                            aria-label="Время начала подготовки"
                             className="field-input field-time-input"
                             onChange={(event) =>
                               updateCaseAvailabilitySlot(
@@ -964,9 +964,9 @@ export function RequestComposerShell({
                           />
                         </label>
                         <label className="field-stack availability-field">
-                          <span className="field-caption">��</span>
+                          <span className="field-caption">До</span>
                           <input
-                            aria-label="����� ��������� ����������"
+                            aria-label="Время окончания подготовки"
                             className="field-input field-time-input"
                             onChange={(event) =>
                               updateCaseAvailabilitySlot(
@@ -987,10 +987,10 @@ export function RequestComposerShell({
 
                 <div className="form-actions-inline">
                   <Button onClick={addCaseAvailabilitySlot} type="button" variant="secondary">
-                    �������� ����
+                    Добавить слот
                   </Button>
                   <p className="helper-text">
-                    ������ ������� 1�3 ������. ����� ���������� � ������� ����:������.
+                    Обычно хватает 1-3 слотов. Время указывайте в формате часы:минуты.
                   </p>
                 </div>
               </div>
@@ -998,7 +998,7 @@ export function RequestComposerShell({
           ) : draft.scenario === "PROJECT" ? (
             <>
               <label className="field-stack">
-                <span className="field-label">�������� �������</span>
+                <span className="field-label">Название проекта</span>
                 <input
                   className="field-input"
                   onChange={(event) =>
@@ -1010,14 +1010,14 @@ export function RequestComposerShell({
                       }
                     })
                   }
-                  placeholder="��������, ������ ��� ������ ���� ��� �����"
+                  placeholder="Например, сервис для поиска команды на кейс"
                   required
                   value={draft.details.projectTitle}
                 />
               </label>
 
               <label className="field-stack">
-                <span className="field-label">������� � �������</span>
+                <span className="field-label">Коротко о проекте</span>
                 <textarea
                   className="field-textarea"
                   onChange={(event) =>
@@ -1029,7 +1029,7 @@ export function RequestComposerShell({
                       }
                     })
                   }
-                  placeholder="��� �� ������� � ��� ������ ����� �������"
+                  placeholder="Что вы делаете и какие люди нужны сейчас"
                   required
                   rows={4}
                   value={draft.details.shortDescription}
@@ -1038,7 +1038,7 @@ export function RequestComposerShell({
 
               <div className="form-grid">
                 <label className="field-stack">
-                  <span className="field-label">������</span>
+                  <span className="field-label">Стадия</span>
                   <select
                     className="field-input field-select"
                     onChange={(event) =>
@@ -1061,7 +1061,7 @@ export function RequestComposerShell({
                 </label>
 
                 <label className="field-stack">
-                  <span className="field-label">��������� �������������</span>
+                  <span className="field-label">Ожидаемая вовлечённость</span>
                   <select
                     className="field-input field-select"
                     onChange={(event) =>
@@ -1086,7 +1086,7 @@ export function RequestComposerShell({
               </div>
 
               <div className="field-stack">
-                <span className="field-label">������ ����</span>
+                <span className="field-label">Нужные роли</span>
                 <div className="toggle-grid">
                   {collaborationRoleOptions.map((role) => (
                     <button
@@ -1111,7 +1111,7 @@ export function RequestComposerShell({
               </div>
 
               <div className="field-stack">
-                <span className="field-label">���������������� ������</span>
+                <span className="field-label">Предпочтительный формат</span>
                 <div className="toggle-grid toggle-grid-compact">
                   {requestFormatOptions.map((format) => (
                     <button
@@ -1174,7 +1174,7 @@ export function RequestComposerShell({
               />
 
               <label className="field-stack">
-                <span className="field-label">������� ��������</span>
+                <span className="field-label">Текущий контекст</span>
                 <textarea
                   className="field-textarea"
                   onChange={(event) =>
@@ -1186,7 +1186,7 @@ export function RequestComposerShell({
                       }
                     })
                   }
-                  placeholder="� ���� �� ���������� ��� ��� ������ ��������"
+                  placeholder="С чем вы разбираетесь или где нужна помощь"
                   required
                   rows={4}
                   value={draft.details.currentContext}
@@ -1194,7 +1194,7 @@ export function RequestComposerShell({
               </label>
 
               <label className="field-stack">
-                <span className="field-label">����</span>
+                <span className="field-label">Цель</span>
                 <textarea
                   className="field-textarea"
                   onChange={(event) =>
@@ -1206,7 +1206,7 @@ export function RequestComposerShell({
                       }
                     })
                   }
-                  placeholder="����� ��������� ������ �������� �� ���������� �����"
+                  placeholder="Какой результат хотите получить от совместной учёбы"
                   required
                   rows={4}
                   value={draft.details.goal}
@@ -1215,7 +1215,7 @@ export function RequestComposerShell({
 
               <div className="form-grid">
                 <label className="field-stack">
-                  <span className="field-label">�������� �������</span>
+                  <span className="field-label">Желаемый ритм</span>
                   <select
                     className="field-input field-select"
                     onChange={(event) =>
@@ -1239,7 +1239,7 @@ export function RequestComposerShell({
                 </label>
 
                 <label className="field-stack">
-                  <span className="field-label">���������������� �����</span>
+                  <span className="field-label">Предпочтительное время</span>
                   <select
                     className="field-input field-select"
                     onChange={(event) =>
@@ -1264,7 +1264,7 @@ export function RequestComposerShell({
               </div>
 
               <div className="field-stack">
-                <span className="field-label">������</span>
+                <span className="field-label">Формат</span>
                 <div className="toggle-grid toggle-grid-compact">
                   {requestFormatOptions.map((format) => (
                     <button
@@ -1291,7 +1291,7 @@ export function RequestComposerShell({
           )}
 
           <label className="field-stack">
-            <span className="field-label">�������, ���� �����</span>
+            <span className="field-label">Заметки, если нужно</span>
             <textarea
               className="field-textarea"
               onChange={(event) =>
@@ -1302,7 +1302,7 @@ export function RequestComposerShell({
                     })
                   : null
               }
-              placeholder="����� �������������� �������� ��� �������� ���������"
+              placeholder="Любые дополнительные вводные для будущего партнёра"
               rows={3}
               value={draft?.notes ?? ""}
             />
@@ -1310,19 +1310,19 @@ export function RequestComposerShell({
 
           <Button disabled={isPending || !draft} fullWidth type="submit">
             {isPending
-              ? "���������..."
+              ? "Сохраняем..."
               : editingRequestId
-                ? "��������� ���������"
-                : "������� ������"}
+                ? "Сохранить изменения"
+                : "Создать запрос"}
           </Button>
         </form>
       </Card>
 
-      <Card eyebrow="�������" title="���� �������">
+      <Card eyebrow="История" title="Ваши запросы">
         {requests.length === 0 ? (
           <p className="card-body-copy">
-            �������� ���� ���. �������� ������, ����� �������� ������� �� ������
-            ����������.
+            Запросов пока нет. Создайте первый, чтобы получить подбор по
+            выбранному сценарию.
           </p>
         ) : (
           <div className="request-history-list">
@@ -1357,7 +1357,7 @@ export function RequestComposerShell({
                             )}`
                           )
                           .join(", ")
-                      : `���� �� ${formatRequestDate(request.expiresAt)}`}
+                      : `Активен до ${formatRequestDate(request.expiresAt)}`}
                   </p>
                 </div>
 
@@ -1365,15 +1365,15 @@ export function RequestComposerShell({
                   {request.status === "ACTIVE" ? (
                     <>
                       <Button onClick={() => startEditingRequest(request)} variant="secondary">
-                        �������������
+                        Редактировать
                       </Button>
                       <Button onClick={() => handleArchive(request.id)} variant="ghost">
-                        ������������
+                        Архивировать
                       </Button>
                     </>
                   ) : (
                     <Button onClick={() => handleRenew(request.id)} variant="secondary">
-                      ��������
+                      Возобновить
                     </Button>
                   )}
                 </div>

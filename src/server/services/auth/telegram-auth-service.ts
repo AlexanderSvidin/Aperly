@@ -83,8 +83,8 @@ async function persistIdentity(params: {
       code: existingUser.status === "BLOCKED" ? "user_blocked" : "user_deleted",
       message:
         existingUser.status === "BLOCKED"
-          ? "��� ������ � Aperly ���������."
-          : "������� ����� � �� ����� ����� �����.",
+          ? "Ваш доступ к Aperly ограничен."
+          : "Аккаунт удалён и не может быть восстановлен.",
       status: 403,
       redirectTo: blockedRedirectForStatus(existingUser.status)
     });
@@ -149,7 +149,7 @@ export const telegramAuthService: TelegramAuthService = {
     if (!telegramServerEnv.TELEGRAM_BOT_TOKEN) {
       throw new TelegramAuthError({
         code: "telegram_not_configured",
-        message: "TELEGRAM_BOT_TOKEN �� ��������.",
+        message: "TELEGRAM_BOT_TOKEN не настроен.",
         status: 500
       });
     }
@@ -186,7 +186,7 @@ export const telegramAuthService: TelegramAuthService = {
     if (!telegramServerEnv.ALLOW_DEV_TELEGRAM_FALLBACK) {
       throw new TelegramAuthError({
         code: "dev_fallback_disabled",
-        message: "��������� ����� ���������� ��������.",
+        message: "Локальный режим разработки отключён.",
         status: 403
       });
     }

@@ -161,7 +161,7 @@ function buildPersonDisplayName(user: {
   return (
     user.profile?.fullName ||
     [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
-    "������������"
+    "Неизвестно"
   );
 }
 
@@ -268,7 +268,7 @@ async function assertChatLimitNotReached(userId: string): Promise<void> {
     throw new ChatDomainError({
       code: "chat_limit_reached",
       message:
-        "��������� ����� �������� ����� (12). ��������� ���� �� ������������ �����, ����� ������� �����.",
+        "Достигнут лимит активных чатов (12). Завершите один из текущих диалогов, чтобы открыть новый.",
       status: 409
     });
   }
@@ -281,14 +281,14 @@ async function assertChatAccess(
   if (!chat) {
     throw new ChatDomainError({
       code: "chat_not_found",
-      message: "��� �� ������.",
+      message: "Чат не найден.",
       status: 404
     });
   }
   if (!isChatParticipant(chat, userId)) {
     throw new ChatDomainError({
       code: "chat_forbidden",
-      message: "������ � ����� ���� ��������.",
+      message: "Доступ к чату запрещён.",
       status: 403
     });
   }
@@ -358,7 +358,7 @@ export const chatService: ChatService = {
     if (!match) {
       throw new ChatDomainError({
         code: "match_not_found",
-        message: "���� �� ������.",
+        message: "Матч не найден.",
         status: 404
       });
     }
@@ -372,7 +372,7 @@ export const chatService: ChatService = {
       ) {
         throw new ChatDomainError({
           code: "chat_forbidden",
-          message: "������ ��������.",
+          message: "Доступ запрещён.",
           status: 403
         });
       }
@@ -387,7 +387,7 @@ export const chatService: ChatService = {
     ) {
       throw new ChatDomainError({
         code: "match_not_active",
-        message: "���� ���������� ��� �������� ����.",
+        message: "Матч недоступен для открытия чата.",
         status: 409
       });
     }
@@ -400,7 +400,7 @@ export const chatService: ChatService = {
       if (userId !== sourceOwnerId && userId !== candidateOwnerId) {
         throw new ChatDomainError({
           code: "match_forbidden",
-          message: "���� ���� ��� �� �����������.",
+          message: "Этот чат уже существует.",
           status: 403
         });
       }
@@ -430,7 +430,7 @@ export const chatService: ChatService = {
           chatId: chat.id,
           senderId: null,
           type: "SYSTEM",
-          text: "��� ������. ����� �������� �������."
+          text: "Чат открыт. Можно начать разговор."
         }
       });
 
@@ -453,17 +453,17 @@ export const chatService: ChatService = {
         throw new ChatDomainError({
           code: "match_forbidden",
           message:
-            "������ ����� ������� ����� ��������� �����������. ���������� ���������� /respond.",
+            "Новый чат откроется после принятия приглашения. Используйте действие ответа.",
           status: 403
         });
       }
-      // No state change needed � match is already PENDING_RECIPIENT_ACCEPTANCE.
+      // No state change needed: match is already PENDING_RECIPIENT_ACCEPTANCE.
       return { status: "INVITE_SENT", matchId: match.id };
     }
 
     throw new ChatDomainError({
       code: "match_state_invalid",
-      message: "���������� ������� ��� ��� ����� ����� � ������� ���������.",
+      message: "Приглашение отправлено. Чат появится после принятия.",
       status: 409
     });
   },
@@ -480,7 +480,7 @@ export const chatService: ChatService = {
     if (!match) {
       throw new ChatDomainError({
         code: "match_not_found",
-        message: "���� �� ������.",
+        message: "Матч не найден.",
         status: 404
       });
     }
@@ -488,7 +488,7 @@ export const chatService: ChatService = {
     if (match.mode !== "REQUEST_TO_PROFILE") {
       throw new ChatDomainError({
         code: "respond_not_applicable",
-        message: "���� ������ �������� ������ � ������������ �� ��������� ��������.",
+        message: "Матч требует приглашения и пока не готов к чату.",
         status: 409
       });
     }
@@ -496,7 +496,7 @@ export const chatService: ChatService = {
     if (match.status !== "PENDING_RECIPIENT_ACCEPTANCE") {
       throw new ChatDomainError({
         code: "match_not_pending",
-        message: "����������� ��� ���� �������, ��������� ��� �������.",
+        message: "Приглашение уже было обработано.",
         status: 409
       });
     }
@@ -504,7 +504,7 @@ export const chatService: ChatService = {
     if (match.candidateProfile?.userId !== userId) {
       throw new ChatDomainError({
         code: "respond_forbidden",
-        message: "�������� �� ����������� ����� ������ ��� ����������.",
+        message: "Ответить на приглашение может только получатель.",
         status: 403
       });
     }
@@ -554,7 +554,7 @@ export const chatService: ChatService = {
           chatId: created.id,
           senderId: null,
           type: "SYSTEM",
-          text: "����������� �������. ��� ������."
+          text: "Приглашение принято. Чат открыт."
         }
       });
 
@@ -641,7 +641,7 @@ export const chatService: ChatService = {
         initiatorDisplayName:
           owner.profile?.fullName ||
           [owner.firstName].filter(Boolean).join(" ") ||
-          "������������",
+          "Неизвестно",
         reasonSummary: match.reasonSummary,
         score: match.score
       };
@@ -700,7 +700,7 @@ export const chatService: ChatService = {
       if (!cursorMsg) {
         throw new ChatDomainError({
           code: "cursor_not_found",
-          message: "������ �� ������.",
+        message: "Сообщение не найдено.",
           status: 400
         });
       }
@@ -775,7 +775,7 @@ export const chatService: ChatService = {
     if (chat!.status === "CLOSED" || chat!.status === "BLOCKED") {
       throw new ChatDomainError({
         code: "chat_not_writable",
-        message: "�������� ��������� � ���� ��� ����������.",
+        message: "Отправка сообщений в этот чат недоступна.",
         status: 409
       });
     }
@@ -848,7 +848,7 @@ export const chatService: ChatService = {
     if (!isStaleByTime(chat!)) {
       throw new ChatDomainError({
         code: "chat_not_stale",
-        message: "����������� ����� ��������� ������ � ���������� ��� (������� ������).",
+        message: "Напоминание можно отправить только в ожидающий ответ чат.",
         status: 409
       });
     }
@@ -856,7 +856,7 @@ export const chatService: ChatService = {
     if (chat!.status === "CLOSED" || chat!.status === "BLOCKED") {
       throw new ChatDomainError({
         code: "chat_not_writable",
-        message: "�������� ����������� � ���� ��� ����������.",
+        message: "Отправка напоминания в этот чат недоступна.",
         status: 409
       });
     }
@@ -869,7 +869,7 @@ export const chatService: ChatService = {
           chatId,
           senderId: userId,
           type: "REMINDER",
-          text: "��������� � ����� �������. ���� ���(�) ���������� ��������."
+          text: "Напоминание о себе отправлено. Ждём ответ собеседника."
         },
         select: {
           id: true,
@@ -913,7 +913,7 @@ export const chatService: ChatService = {
     if (chat!.status === "CLOSED" || chat!.status === "BLOCKED") {
       throw new ChatDomainError({
         code: "chat_not_writable",
-        message: "����� ���������� � ���� ���� ����������.",
+        message: "Обмен контактами в этом чате недоступен.",
         status: 409
       });
     }
@@ -923,8 +923,8 @@ export const chatService: ChatService = {
         code: "contact_exchange_already_initiated",
         message:
           chat!.contactExchangeStatus === "REQUESTED_ONE_SIDED"
-            ? "������ �� ����� ���������� ��� ���������. �������� ������."
-            : "����� ���������� ��� ��������.",
+            ? "Запрос на обмен контактами уже отправлен. Дождитесь ответа."
+            : "Запрос на обмен контактами отправлен.",
         status: 409
       });
     }
@@ -948,7 +948,7 @@ export const chatService: ChatService = {
           chatId,
           senderId: null,
           type: "SYSTEM",
-          text: "���� �� ���������� ��������� ���������� ����������."
+          text: "Один из участников запросил обмен контактами."
         }
       })
     ]);
@@ -991,8 +991,8 @@ export const chatService: ChatService = {
         code: "contact_exchange_not_pending",
         message:
           chat!.contactExchangeStatus === "MUTUAL_CONSENT"
-            ? "�������� ��� ��������."
-            : "��� ��������� ������� �� ����� ����������.",
+            ? "Контакты уже открыты."
+            : "Нет активного запроса на обмен контактами.",
         status: 409
       });
     }
@@ -1000,7 +1000,7 @@ export const chatService: ChatService = {
     if (chat!.contactRequestedByUserId === userId) {
       throw new ChatDomainError({
         code: "contact_exchange_self_respond",
-        message: "�� �� ������ �������� �� ����������� ������.",
+        message: "Вы не можете ответить на собственный запрос.",
         status: 409
       });
     }
@@ -1019,7 +1019,7 @@ export const chatService: ChatService = {
             chatId,
             senderId: null,
             type: "SYSTEM",
-            text: "����� ���������� �������. ��� ������� ���������."
+            text: "Обмен контактами принят. Контакты открыты."
           }
         })
       ]);
@@ -1027,7 +1027,7 @@ export const chatService: ChatService = {
       return { status: "DECLINED" as const, revealedContacts: null };
     }
 
-    // ACCEPT � reach mutual consent.
+    // ACCEPT: reach mutual consent.
     await prisma.$transaction([
       prisma.chat.update({
         where: { id: chatId },
@@ -1044,7 +1044,7 @@ export const chatService: ChatService = {
           chatId,
           senderId: null,
           type: "SYSTEM",
-          text: "��� ��������� ����������� ���������� ����������. �������� ������ ��������."
+          text: "Ваш собеседник подтвердил обмен контактами. Контакты открыты."
         }
       })
     ]);
@@ -1070,7 +1070,7 @@ export const chatService: ChatService = {
         userId
       });
     }
-    // STUDY: no CASE/PROJECT event � only the earlier exchange_contacts event.
+    // STUDY: no CASE/PROJECT event, only the earlier exchange_contacts event.
 
     return {
       status: "MUTUAL_CONSENT_REACHED" as const,

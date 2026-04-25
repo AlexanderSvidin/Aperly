@@ -215,12 +215,12 @@ export const profileService = {
       });
 
     if (!currentUser) {
-      throw new Error("������������ �� ������.");
+      throw new Error("Пользователь не найден.");
     }
 
     if (currentUser.status === "BLOCKED" || currentUser.status === "DELETED") {
       throw new Error(
-        "������� ������ �������� ��� ���������������� ��� ��������� ������������."
+        "Анкета недоступна для заблокированного или удалённого пользователя."
       );
     }
 
@@ -257,7 +257,7 @@ export const profileService = {
       });
 
       if (skillsCount !== resolvedSkillIds.length) {
-        throw new Error("��������� ������ ������ �� ����������.");
+        throw new Error("Некоторые выбранные навыки не существуют.");
       }
 
       const resolvedSubjectIds = await resolveSubjectIdsWithCustomNames(transaction, {
@@ -274,7 +274,7 @@ export const profileService = {
       });
 
       if (subjectsCount !== resolvedSubjectIds.length) {
-        throw new Error("��������� �������� ������ �� ����������.");
+        throw new Error("Некоторые выбранные предметы не существуют.");
       }
 
       const profile = await transaction.profile.upsert({
