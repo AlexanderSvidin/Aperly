@@ -4,18 +4,18 @@ const studyCatalog = require("../src/features/study/lib/study-catalog.json");
 const prisma = new PrismaClient();
 
 const skillSeeds = [
-  { slug: "analysis", name: "���������" },
-  { slug: "research", name: "������������" },
-  { slug: "presentation", name: "�����������" },
-  { slug: "python", name: "������" },
-  { slug: "product", name: "���������� ���������" },
-  { slug: "design", name: "������" },
-  { slug: "marketing", name: "���������" },
-  { slug: "finance", name: "�������" },
-  { slug: "frontend", name: "����������" },
-  { slug: "backend", name: "��������� ����������" },
-  { slug: "ux", name: "���������������� ����" },
-  { slug: "copywriting", name: "������" }
+  { slug: "analysis",     name: "Аналитика" },
+  { slug: "research",     name: "Исследования" },
+  { slug: "presentation", name: "Презентации" },
+  { slug: "python",       name: "Программирование" },
+  { slug: "product",      name: "Управление продуктом" },
+  { slug: "design",       name: "Дизайн" },
+  { slug: "marketing",    name: "Маркетинг" },
+  { slug: "finance",      name: "Финансы" },
+  { slug: "frontend",     name: "Фронтенд" },
+  { slug: "backend",      name: "Бэкенд разработка" },
+  { slug: "ux",           name: "Исследование пользователей" },
+  { slug: "copywriting",  name: "Тексты" }
 ];
 
 const subjectSeeds = [
@@ -1102,11 +1102,13 @@ async function main() {
   await prisma.subject.deleteMany();
 
   await prisma.skill.createMany({
-    data: skillSeeds
+    data: skillSeeds,
+    skipDuplicates: true
   });
 
   await prisma.subject.createMany({
-    data: subjectSeeds
+    data: subjectSeeds,
+    skipDuplicates: true
   });
 
   const createdUsers = {};

@@ -21,7 +21,11 @@
       "Bash(cat)",
       "Read(//tmp/**)",
       "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && grep -o \"export async function [A-Z]*\" {} | head -5')",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npx prisma *)",
+      "Bash(node -e \"const c=require\\('./src/features/study/lib/study-catalog.json'\\); const slugs=c.subjects.map\\(s=>s.slug\\); const extra=['statistics','programming','finance','management']; const dups=extra.filter\\(s=>slugs.includes\\(s\\)\\); console.log\\('Subject slugs in catalog:', slugs.length\\); console.log\\('Overlapping with manual additions:', dups\\);\")",
+      "Bash(node --env-file=.env -e ' *)",
+      "Bash(node -e ' *)"
     ]
   }
 }
