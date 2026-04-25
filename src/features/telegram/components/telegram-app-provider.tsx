@@ -10,8 +10,7 @@ import {
 
 import {
   applyTelegramTheme,
-  buildTelegramRuntimeSession,
-  getTelegramWebApp
+  buildTelegramRuntimeSession
 } from "@/features/telegram/lib/browser";
 import { createDevTelegramSession } from "@/features/telegram/lib/dev-fallback";
 import type { TelegramRuntimeSession } from "@/features/telegram/lib/types";
@@ -40,11 +39,18 @@ export function TelegramAppProvider({ children }: { children: ReactNode }) {
       }, 0);
     };
 
-    const webApp = getTelegramWebApp();
+    if (typeof window !== "undefined" && window.Telegram?.WebApp) {
+      const Telegram = window.Telegram;
+      const webApp = Telegram.WebApp!;
 
-    if (webApp) {
-      webApp.ready();
-      webApp.expand();
+      console.log("Telegram WebApp detected", Telegram.WebApp!.initData);
+      console.log(
+        "Telegram WebApp initDataUnsafe",
+        Telegram.WebApp!.initDataUnsafe
+      );
+
+      Telegram.WebApp!.ready();
+      Telegram.WebApp!.expand();
       applyTelegramTheme(webApp);
 
       scheduleSessionUpdate(buildTelegramRuntimeSession(webApp));
@@ -55,7 +61,10 @@ export function TelegramAppProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    if (clientEnv.NEXT_PUBLIC_ENABLE_DEV_TELEGRAM_FALLBACK) {
+    if (
+      process.env.NODE_ENV !== "production" &&
+      clientEnv.NEXT_PUBLIC_ENABLE_DEV_TELEGRAM_FALLBACK
+    ) {
       scheduleSessionUpdate(createDevTelegramSession());
       return () => {
         if (timeoutId !== null) {

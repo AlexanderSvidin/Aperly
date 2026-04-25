@@ -14,9 +14,17 @@ type AuthErrorState = {
   message: string;
 };
 
-function getRuntimeHint(source: "telegram" | "dev" | "browser", hasInitData: boolean) {
+function getRuntimeHint(
+  source: "telegram" | "dev" | "browser",
+  hasInitData: boolean,
+  hasTelegramWebApp: boolean
+) {
   if (source === "telegram" && hasInitData) {
     return "Приложение открыто в Telegram. Можно продолжить без отдельной регистрации.";
+  }
+
+  if (source === "telegram" || hasTelegramWebApp) {
+    return "Telegram WebApp найден, но initData пустой. Откройте Aperly через кнопку Mini App в Telegram.";
   }
 
   if (source === "dev") {
@@ -29,6 +37,8 @@ function getRuntimeHint(source: "telegram" | "dev" | "browser", hasInitData: boo
 export function AuthEntryCard() {
   const router = useRouter();
   const telegram = useTelegramApp();
+  const hasTelegramWebApp =
+    typeof window !== "undefined" && Boolean(window.Telegram?.WebApp);
   const [error, setError] = useState<AuthErrorState | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -87,8 +97,12 @@ export function AuthEntryCard() {
   return (
     <Card eyebrow="Быстрый вход" title="Начать">
       <div className="screen-stack">
-        <p className="card-body-copy">
-          {getRuntimeHint(telegram.source, Boolean(telegram.initData))}
+        <p className="card-body-copy" suppressHydrationWarning>
+          {getRuntimeHint(
+            telegram.source,
+            Boolean(telegram.initData),
+            hasTelegramWebApp
+          )}
         </p>
 
         {error ? <p className="error-text">{error.message}</p> : null}
