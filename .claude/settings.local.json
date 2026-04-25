@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Read(//usr/local/**)",
+      "Read(//usr/**)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Users/Василий/AppData/Roaming/**)",
+      "Read(//c/Users/Василий/**)",
+      "Bash(cmd.exe /c \"where node\")",
+      "Bash(reg.exe QUERY \"HKEY_LOCAL_MACHINE\\\\SOFTWARE\\\\Node.js\" /v InstallPath)",
+      "Bash(reg.exe QUERY \"HKLM\\\\SOFTWARE\\\\Node.js\")",
+      "Bash(reg.exe QUERY \"HKCU\\\\Software\\\\Node.js\")",
+      "Bash(/cmd/reg.exe QUERY \"HKLM\\\\SOFTWARE\\\\Node.js\")",
+      "Bash(/cmd/reg.exe QUERY \"HKEY_LOCAL_MACHINE\\\\SOFTWARE\\\\Node.js\")",
+      "Bash(cmd.exe /C \"C:\\\\Users\\\\Василий\\\\Documents\\\\Книги Александр\\\\Я в деле\\\\мой проект\\\\MVP1\\\\find_node.bat\")",
+      "Bash(start \"\" \"C:\\\\Users\\\\Василий\\\\Documents\\\\Книги Александр\\\\Я в деле\\\\мой проект\\\\MVP1\\\\find_node.bat\")",
+      "Bash(\"/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe\" -Command \"where.exe node 2>&1; node --version 2>&1; npm --version 2>&1\")",
+      "Bash(\"/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe\" -Command \"[Environment]::GetEnvironmentVariable\\('Path', 'Machine'\\) + ';' + [Environment]::GetEnvironmentVariable\\('Path', 'User'\\)\")",
+      "Bash(\"/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe\" -Command \"Get-ChildItem 'C:\\\\Users\\\\Василий\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\\\\node*' 2>&1; Get-ChildItem 'C:\\\\Users\\\\Василий\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\\\\npm*' 2>&1\")",
+      "Bash(cat)",
+      "Read(//tmp/**)",
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && grep -o \"export async function [A-Z]*\" {} | head -5')",
+      "Bash(npm run *)"
+    ]
+  }
+}

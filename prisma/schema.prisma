@@ -1,0 +1,507 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+  DELETED
+}
+
+enum VerificationType {
+  TELEGRAM
+  HSE_EMAIL
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum ScenarioType {
+  CASE
+  PROJECT
+  STUDY
+}
+
+enum CollaborationRole {
+  ANALYST
+  DEVELOPER
+  DESIGNER
+  PRODUCT_MANAGER
+  RESEARCHER
+  MARKETER
+  FINANCE
+  PRESENTER
+  OTHER
+}
+
+enum FormatPreference {
+  ONLINE
+  OFFLINE
+  HYBRID
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum ProjectStage {
+  IDEA
+  MVP
+  EARLY_TRACTION
+  OPERATING
+}
+
+enum CommitmentLevel {
+  LIGHT
+  PART_TIME
+  HEAVY
+  FLEXIBLE
+}
+
+enum StudyFrequency {
+  ONCE
+  WEEKLY
+  TWICE_WEEKLY
+  FLEXIBLE
+}
+
+enum PreferredTime {
+  MORNING
+  AFTERNOON
+  EVENING
+  FLEXIBLE
+}
+
+enum RequestStatus {
+  ACTIVE
+  EXPIRED
+  CLOSED
+  DELETED
+}
+
+enum MatchMode {
+  REQUEST_TO_REQUEST
+  REQUEST_TO_PROFILE
+}
+
+enum MatchStatus {
+  READY
+  PENDING_RECIPIENT_ACCEPTANCE
+  DECLINED
+  EXPIRED
+  CLOSED
+}
+
+enum ChatStatus {
+  ACTIVE
+  STALE
+  CLOSED
+  BLOCKED
+}
+
+enum ContactExchangeStatus {
+  NOT_REQUESTED
+  REQUESTED_ONE_SIDED
+  MUTUAL_CONSENT
+  DECLINED
+}
+
+enum MessageType {
+  USER
+  SYSTEM
+  REMINDER
+}
+
+enum SessionStatus {
+  PROPOSED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  MISSED
+}
+
+enum SessionNextAction {
+  NONE
+  SCHEDULE_NEXT
+  FIND_NEW_PARTNER
+  STOP_SEARCHING
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum AdminActionType {
+  BLOCK_USER
+  DISABLE_USER
+  UNBLOCK_USER
+  RESOLVE_REPORT
+}
+
+model User {
+  id                   String        @id @default(uuid()) @db.Uuid
+  telegramId           BigInt        @unique
+  username             String?       @db.VarChar(64)
+  firstName            String        @db.VarChar(100)
+  lastName             String?       @db.VarChar(100)
+  languageCode         String?       @db.VarChar(16)
+  role                 UserRole      @default(USER)
+  status               UserStatus    @default(ACTIVE)
+  onboardingCompleted  Boolean       @default(false)
+  blockedAt            DateTime?
+  deletedAt            DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  profile              Profile?
+  verifications        Verification[]
+  userSkills           UserSkill[]
+  userSubjects         UserSubject[]
+  requests             Request[]     @relation("RequestOwner")
+  sentMessages         Message[]     @relation("MessageSender")
+  chatsAsUserA         Chat[]        @relation("ChatUserA")
+  chatsAsUserB         Chat[]        @relation("ChatUserB")
+  contactRequests      Chat[]        @relation("ChatContactRequestedBy")
+  scheduledSessions    Session[]     @relation("SessionScheduledBy")
+  filedReports         Report[]      @relation("ReportReporter")
+  targetReports        Report[]      @relation("ReportTargetUser")
+  resolvedReports      Report[]      @relation("ReportResolvedByAdmin")
+  adminActions         AdminAction[] @relation("AdminActionActor")
+  targetedAdminActions AdminAction[] @relation("AdminActionTargetUser")
+
+  @@index([role])
+  @@index([status, blockedAt, deletedAt])
+}
+
+model Profile {
+  id                    String              @id @default(uuid()) @db.Uuid
+  userId                String              @unique @db.Uuid
+  fullName              String              @db.VarChar(160)
+  bio                   String?             @db.Text
+  program               String?             @db.VarChar(120)
+  courseYear            Int?
+  campus                String?             @db.VarChar(120)
+  preferredFormats      FormatPreference[]  @default([])
+  preferredRoles        CollaborationRole[] @default([])
+  isDiscoverable        Boolean             @default(false)
+  discoverableScenarios ScenarioType[]      @default([])
+  telegramUsername      String?             @db.VarChar(64)
+  phone                 String?             @db.VarChar(32)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availabilitySlots     AvailabilitySlot[]  @relation("ProfileAvailability")
+  fallbackMatches       Match[]             @relation("MatchTargetProfile")
+
+  @@index([isDiscoverable])
+}
+
+model Verification {
+  id         String             @id @default(uuid()) @db.Uuid
+  userId     String             @db.Uuid
+  type       VerificationType
+  status     VerificationStatus @default(PENDING)
+  email      String?            @db.VarChar(160)
+  requestedAt DateTime          @default(now())
+  verifiedAt DateTime?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([type, status])
+}
+
+model Skill {
+  id         String      @id @default(uuid()) @db.Uuid
+  slug       String      @unique @db.VarChar(64)
+  name       String      @unique @db.VarChar(120)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  userSkills UserSkill[]
+}
+
+model Subject {
+  id            String              @id @default(uuid()) @db.Uuid
+  slug          String              @unique @db.VarChar(64)
+  name          String              @db.VarChar(120)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  userSubjects  UserSubject[]
+  studyRequests StudyRequestDetails[]
+}
+
+model UserSkill {
+  userId    String   @db.Uuid
+  skillId   String   @db.Uuid
+  level     Int?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill     Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([userId, skillId])
+  @@index([skillId])
+}
+
+model UserSubject {
+  userId     String   @db.Uuid
+  subjectId  String   @db.Uuid
+  confidence Int?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject    Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, subjectId])
+  @@index([subjectId])
+}
+
+model Request {
+  id               String                @id @default(uuid()) @db.Uuid
+  ownerId          String                @db.Uuid
+  scenario         ScenarioType
+  status           RequestStatus         @default(ACTIVE)
+  notes            String?               @db.Text
+  expiresAt        DateTime
+  lastMatchedAt    DateTime?
+  closedAt         DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  owner            User                  @relation("RequestOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  caseDetails      CaseRequestDetails?
+  projectDetails   ProjectRequestDetails?
+  studyDetails     StudyRequestDetails?
+  availabilitySlots AvailabilitySlot[]   @relation("RequestAvailability")
+  sourceMatches    Match[]               @relation("MatchSourceRequest")
+  candidateMatches Match[]               @relation("MatchTargetRequest")
+  reports          Report[]
+  adminActions     AdminAction[]         @relation("AdminActionRequest")
+
+  @@index([ownerId, scenario, status])
+  @@index([status, expiresAt])
+  @@index([scenario, status, expiresAt])
+}
+
+model CaseRequestDetails {
+  id              String              @id @default(uuid()) @db.Uuid
+  requestId       String              @unique @db.Uuid
+  eventName       String              @db.VarChar(160)
+  deadline        DateTime?
+  neededRoles     CollaborationRole[] @default([])
+  teamGapSize     Int
+  preferredFormat FormatPreference
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  request         Request             @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([deadline])
+}
+
+model ProjectRequestDetails {
+  id                 String              @id @default(uuid()) @db.Uuid
+  requestId          String              @unique @db.Uuid
+  projectTitle       String              @db.VarChar(160)
+  shortDescription   String              @db.Text
+  stage              ProjectStage
+  neededRoles        CollaborationRole[] @default([])
+  expectedCommitment CommitmentLevel
+  preferredFormat    FormatPreference
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  request            Request             @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([stage])
+}
+
+model StudyRequestDetails {
+  id               String           @id @default(uuid()) @db.Uuid
+  requestId        String           @unique @db.Uuid
+  subjectId        String           @db.Uuid
+  currentContext   String           @db.Text
+  goal             String           @db.Text
+  desiredFrequency StudyFrequency
+  preferredTime    PreferredTime
+  preferredFormat  FormatPreference
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  request          Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  subject          Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@index([subjectId, desiredFrequency])
+}
+
+model AvailabilitySlot {
+  id         String    @id @default(uuid()) @db.Uuid
+  profileId  String?   @db.Uuid
+  requestId  String?   @db.Uuid
+  dayOfWeek  DayOfWeek
+  startMinute Int
+  endMinute  Int
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  profile    Profile?  @relation("ProfileAvailability", fields: [profileId], references: [id], onDelete: Cascade)
+  request    Request?  @relation("RequestAvailability", fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, dayOfWeek])
+  @@index([requestId, dayOfWeek])
+}
+
+model Match {
+  id                String      @id @default(uuid()) @db.Uuid
+  pairKey           String      @unique @db.VarChar(255)
+  scenario          ScenarioType
+  mode              MatchMode
+  status            MatchStatus @default(READY)
+  sourceRequestId   String      @db.Uuid
+  candidateRequestId String?    @db.Uuid
+  candidateProfileId String?    @db.Uuid
+  score             Int
+  reasonSummary     String      @db.VarChar(255)
+  reasonDetails     Json?
+  computedAt        DateTime    @default(now())
+  expiresAt         DateTime?
+  sourceRequest     Request     @relation("MatchSourceRequest", fields: [sourceRequestId], references: [id], onDelete: Cascade)
+  candidateRequest  Request?    @relation("MatchTargetRequest", fields: [candidateRequestId], references: [id], onDelete: Cascade)
+  candidateProfile  Profile?    @relation("MatchTargetProfile", fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  chat              Chat?
+  sessions          Session[]
+  reports           Report[]
+
+  @@index([sourceRequestId, status])
+  @@index([candidateRequestId])
+  @@index([candidateProfileId])
+  @@index([scenario, status, score])
+}
+
+model Chat {
+  id                     String                @id @default(uuid()) @db.Uuid
+  matchId                String                @unique @db.Uuid
+  userAId                String                @db.Uuid
+  userBId                String                @db.Uuid
+  status                 ChatStatus            @default(ACTIVE)
+  contactExchangeStatus  ContactExchangeStatus @default(NOT_REQUESTED)
+  contactRequestedByUserId String?             @db.Uuid
+  userAContactAcceptedAt DateTime?
+  userBContactAcceptedAt DateTime?
+  contactSharedAt        DateTime?
+  lastMessageAt          DateTime?
+  staleAfterAt           DateTime?
+  closedAt               DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  match                  Match                 @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userA                  User                  @relation("ChatUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB                  User                  @relation("ChatUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  contactRequestedBy     User?                 @relation("ChatContactRequestedBy", fields: [contactRequestedByUserId], references: [id], onDelete: SetNull)
+  messages               Message[]
+  sessions               Session[]
+  reports                Report[]
+
+  @@index([userAId, status, lastMessageAt])
+  @@index([userBId, status, lastMessageAt])
+}
+
+model Message {
+  id        String      @id @default(uuid()) @db.Uuid
+  chatId    String      @db.Uuid
+  senderId  String?     @db.Uuid
+  type      MessageType @default(USER)
+  text      String      @db.Text
+  createdAt DateTime    @default(now())
+  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender    User?       @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([chatId, createdAt])
+}
+
+model Session {
+  id              String            @id @default(uuid()) @db.Uuid
+  matchId         String            @db.Uuid
+  chatId          String            @db.Uuid
+  scheduledByUserId String          @db.Uuid
+  sequenceNumber  Int
+  scheduledFor    DateTime
+  format          FormatPreference
+  location        String?           @db.VarChar(160)
+  notes           String?           @db.Text
+  status          SessionStatus     @default(PROPOSED)
+  nextAction      SessionNextAction @default(NONE)
+  confirmedAt     DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  match           Match             @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  chat            Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  scheduledBy     User              @relation("SessionScheduledBy", fields: [scheduledByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([chatId, sequenceNumber])
+  @@index([matchId, status, scheduledFor])
+  @@index([chatId, status, scheduledFor])
+}
+
+model Report {
+  id                String       @id @default(uuid()) @db.Uuid
+  reporterUserId    String       @db.Uuid
+  targetUserId      String?      @db.Uuid
+  matchId           String?      @db.Uuid
+  chatId            String?      @db.Uuid
+  requestId         String?      @db.Uuid
+  reasonCode        String       @db.VarChar(80)
+  details           String?      @db.Text
+  status            ReportStatus @default(OPEN)
+  resolvedByAdminId String?      @db.Uuid
+  resolvedAt        DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  reporter          User         @relation("ReportReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  targetUser        User?        @relation("ReportTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  match             Match?       @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  chat              Chat?        @relation(fields: [chatId], references: [id], onDelete: SetNull)
+  request           Request?     @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  resolvedByAdmin   User?        @relation("ReportResolvedByAdmin", fields: [resolvedByAdminId], references: [id], onDelete: SetNull)
+  adminActions      AdminAction[]
+
+  @@index([status, createdAt])
+  @@index([targetUserId, status])
+}
+
+model AdminAction {
+  id           String          @id @default(uuid()) @db.Uuid
+  adminUserId  String          @db.Uuid
+  actionType   AdminActionType
+  targetUserId String?         @db.Uuid
+  reportId     String?         @db.Uuid
+  requestId    String?         @db.Uuid
+  notes        String?         @db.Text
+  createdAt    DateTime        @default(now())
+  adminUser    User            @relation("AdminActionActor", fields: [adminUserId], references: [id], onDelete: Restrict)
+  targetUser   User?           @relation("AdminActionTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  report       Report?         @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  request      Request?        @relation("AdminActionRequest", fields: [requestId], references: [id], onDelete: SetNull)
+
+  @@index([actionType, createdAt])
+  @@index([targetUserId, createdAt])
+}

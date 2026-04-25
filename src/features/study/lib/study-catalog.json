@@ -1,0 +1,707 @@
+{
+  "levels": [
+    {
+      "id": "BACHELOR",
+      "label": "Бакалавриат",
+      "programs": [
+        {
+          "id": "ba-international-business-economics",
+          "label": "Международная программа по бизнесу и экономике"
+        },
+        {
+          "id": "ba-business-management",
+          "label": "Управление бизнесом"
+        },
+        {
+          "id": "ba-creative-industries-management",
+          "label": "Менеджмент в креативных индустриях"
+        },
+        {
+          "id": "ba-software-engineering-business-informatics",
+          "label": "Программная инженерия и бизнес-информатика"
+        },
+        {
+          "id": "ba-software-systems-automation",
+          "label": "Программные системы и автоматизация процессов"
+        }
+      ]
+    },
+    {
+      "id": "MASTER",
+      "label": "Магистратура",
+      "programs": [
+        {
+          "id": "ma-business-development-management",
+          "label": "Управление развитием бизнеса"
+        },
+        {
+          "id": "ma-entrepreneurship-law",
+          "label": "Правовое обеспечение предпринимательской деятельности"
+        },
+        {
+          "id": "ma-it-lawyer",
+          "label": "IT-юрист"
+        },
+        {
+          "id": "ma-public-municipal-management",
+          "label": "Государственное и муниципальное управление"
+        },
+        {
+          "id": "ma-business-analytics",
+          "label": "Бизнес-аналитика"
+        },
+        {
+          "id": "ma-financial-strategies-analytics",
+          "label": "Финансовые стратегии и аналитика"
+        },
+        {
+          "id": "ma-product-marketing-analytics",
+          "label": "Продуктовый маркетинг и аналитика"
+        }
+      ]
+    }
+  ],
+  "englishLevels": [
+    {
+      "level": "A1",
+      "slug": "english-a1",
+      "name": "Английский — A1"
+    },
+    {
+      "level": "A2",
+      "slug": "english-a2",
+      "name": "Английский — A2"
+    },
+    {
+      "level": "B1",
+      "slug": "english-b1",
+      "name": "Английский — B1"
+    },
+    {
+      "level": "B2",
+      "slug": "english-b2",
+      "name": "Английский — B2"
+    },
+    {
+      "level": "C1",
+      "slug": "english-c1",
+      "name": "Английский — C1"
+    },
+    {
+      "level": "C2",
+      "slug": "english-c2",
+      "name": "Английский — C2"
+    }
+  ],
+  "subjects": [
+    {
+      "slug": "life-safety",
+      "name": "Безопасность жизнедеятельности",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "business-statistics",
+      "name": "Бизнес-статистика",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "english-course",
+      "name": "English",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "linear-algebra",
+      "name": "Линейная алгебра",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "macroeconomics",
+      "name": "Макроэкономика",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "mathematical-analysis-1",
+      "name": "Математический анализ I",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "mathematical-analysis-2",
+      "name": "Математический анализ II",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "microeconomics",
+      "name": "Микроэкономика",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "general-management",
+      "name": "Общий менеджмент",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "organizational-behavior",
+      "name": "Организационное поведение",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "russian-statehood-basics",
+      "name": "Основы российской государственности",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "legal-literacy",
+      "name": "Правовая грамотность",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "social-design-seminar",
+      "name": "Проектный семинар \"Социальное проектирование\"",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "psychology",
+      "name": "Психология",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "digital-literacy",
+      "name": "Цифровая грамотность",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "business-ethics-sustainability",
+      "name": "Business Ethics and Sustainable Development",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 1
+    },
+    {
+      "slug": "python-data-analysis",
+      "name": "Python для анализа данных",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "accounting",
+      "name": "Бухгалтерский учет",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "history-of-russia",
+      "name": "История России",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "external-digital-competencies-final-control-2",
+      "name": "Внешнее измерение цифровых компетенций. Итоговый контроль",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "marketing",
+      "name": "Marketing",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "microeconomics-2",
+      "name": "Микроэкономика II",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "independent-programming-exam-basic",
+      "name": "Независимый экзамен по программированию. Базовый уровень",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "coursework-preparation-seminar",
+      "name": "Научно-исследовательский семинар \"Подготовка курсовой работы\"",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "independent-russian-exam",
+      "name": "Независимый экзамен по русскому языку",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "intro-econometrics",
+      "name": "Основы эконометрики",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "entrepreneurship",
+      "name": "Предпринимательство",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "managerial-decision-making",
+      "name": "Принятие управленческих решений",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "probability-statistics",
+      "name": "Теория вероятностей и математическая статистика",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "game-theory",
+      "name": "Теория игр",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "project-management",
+      "name": "Управление проектами",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "human-resources-management",
+      "name": "Управление человеческими ресурсами",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "financial-management",
+      "name": "Финансовый менеджмент",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 2
+    },
+    {
+      "slug": "agile-management",
+      "name": "Agile-менеджмент",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "esg-business-strategy",
+      "name": "ESG-стратегии развития бизнеса",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "business-data-analysis",
+      "name": "Анализ данных в бизнесе",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "business-analytics",
+      "name": "Бизнес-аналитика",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "external-digital-competencies-final-control-3",
+      "name": "Внешнее измерение цифровых компетенций. Итоговый контроль",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "business-process-design",
+      "name": "Дизайн бизнес-процессов",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "differential-equations",
+      "name": "Дифференциальные уравнения",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "investment-analysis",
+      "name": "Инвестиционный анализ",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "leadership-team-management",
+      "name": "Лидерство и управление командой",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "machine-learning-economics-finance",
+      "name": "Machine learning in Economics and Finance",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "ifrs",
+      "name": "Международные стандарты финансовой отчетности",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "tax-planning",
+      "name": "Налоги и налоговое планирование",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "research-methods-business-economics",
+      "name": "Научно-исследовательский семинар \"Методы исследований в бизнесе и экономике\"",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "independent-data-ai-generative-models-exam-basic",
+      "name": "Независимый экзамен по анализу данных, искусственному интеллекту и генеративным моделям. Базовый уровень",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "independent-english-exam",
+      "name": "Independent English Exam",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "business-law-basics",
+      "name": "Правовые основы бизнеса",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "product-management",
+      "name": "Продакт-менеджмент",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "product-analytics",
+      "name": "Продуктовая аналитика",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "regional-economy",
+      "name": "Региональная экономика",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "russian-economy",
+      "name": "Российская экономика",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "mergers-acquisitions",
+      "name": "Слияния и поглощения",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "strategic-management",
+      "name": "Strategic Management",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "foreign-economic-activity-management",
+      "name": "Управление внешнеэкономической деятельностью",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "change-management",
+      "name": "Управление изменениями",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "quality-management",
+      "name": "Управление качеством",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "financial-accounting-reporting",
+      "name": "Финансовый учет и отчетность",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "finance-and-society",
+      "name": "Finance and Society",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "digital-business-transformation",
+      "name": "Цифровая трансформация бизнеса",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "econometrics",
+      "name": "Эконометрика",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "economic-analysis",
+      "name": "Экономический анализ",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 3
+    },
+    {
+      "slug": "digital-marketing",
+      "name": "Digital-маркетинг",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "sql-data-modeling",
+      "name": "SQL для работы с данными и моделирования",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "nlp-analysis-ai",
+      "name": "Анализ NLP методами искусственного интеллекта",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "time-series-analysis",
+      "name": "Анализ временных рядов",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "banking-financial-management",
+      "name": "Банковский финансовый менеджмент",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "branding",
+      "name": "Брендинг",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "public-procurement",
+      "name": "Государственные закупки: теория и практика",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "business-project-investment-evaluation",
+      "name": "Инвестиционная оценка бизнес-проектов",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "corporate-information-systems",
+      "name": "Корпоративные информационные системы",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "logistics-supply-chain",
+      "name": "Логистика и управление цепями поставок",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "international-economics-finance",
+      "name": "Международная экономика и финансы",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "research-project-seminar",
+      "name": "Научно-исследовательский семинар \"Научно-исследовательский проект\"",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "business-valuation",
+      "name": "Оценка стоимости бизнеса",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "operations-efficiency",
+      "name": "Повышение операционной эффективности бизнеса",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "project-proposal",
+      "name": "Project Proposal",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "business-architecture-development",
+      "name": "Разработка архитектуры бизнеса",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "risk-management-finance",
+      "name": "Риск-менеджмент",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "strategic-analysis-consulting",
+      "name": "Стратегический анализ и консалтинг",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "sales-crm-management",
+      "name": "Управление продажами и взаимоотношениями с клиентами",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "risk-management-management",
+      "name": "Управление рисками",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "managing-talent",
+      "name": "Managing Talent",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "managerial-accounting",
+      "name": "Управленческий учет",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "financial-planning",
+      "name": "Финансовое планирование",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    },
+    {
+      "slug": "economic-growth",
+      "name": "Economic Growth",
+      "levelId": "BACHELOR",
+      "programId": "ba-international-business-economics",
+      "courseYear": 4
+    }
+  ]
+}

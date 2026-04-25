@@ -1,0 +1,9 @@
+export { analyticsService } from "@/server/services/analytics/analytics-service";
+export { telegramAuthService } from "@/server/services/auth/telegram-auth-service";
+export { chatService } from "@/server/services/chat/chat-service";
+export { homeService } from "@/server/services/home/home-service";
+export { matchingService } from "@/server/services/matching/matching-service";
+export { moderationService } from "@/server/services/moderation/moderation-service";
+export { profileService } from "@/server/services/profile/profile-service";
+export { requestService } from "@/server/services/requests/request-service";
+export { studySessionService } from "@/server/services/study-sessions/study-session-service";

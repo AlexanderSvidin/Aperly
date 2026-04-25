@@ -1,0 +1,8 @@
+PATH=C:\Users\Василий\bin;C:\Users\Василий\Documents\AlexProg\mingw64\bin;C:\Users\Василий\Documents\AlexProg\usr\local\bin;C:\Users\Василий\Documents\AlexProg\usr\bin;C:\Users\Василий\Documents\AlexProg\usr\bin;C:\Users\Василий\Documents\AlexProg\mingw64\bin;C:\Users\Василий\Documents\AlexProg\usr\bin;C:\Users\Василий\bin;C:\Users\Василий\Desktop\Программирование Git;C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Git;C:\Users\Василий\Documents\AlexProg\cmd;C:\Program Files\mingw64\bin;C:\Users\Василий\AppData\Local\Microsoft\WindowsApps;C:\Users\Василий\AppData\Local\Programs\Microsoft VS Code\bin;C:\Program Files\JetBrains\PyCharm Community Edition 2023.2\bin;C:\Users\Василий\AppData\Roaming\Python\Python313\Scripts;C:\Users\Василий\AppData\Local\GitHubDesktop\bin;C:\Users\Василий\AppData\Local\Programs\Python\Python311;C:\Users\Василий\Documents\AlexProg\usr\bin\vendor_perl;C:\Users\Василий\Documents\AlexProg\usr\bin\core_perl;C:\Users\Василий\AppData\Roaming\Claude\local-agent-mode-sessions\skills-plugin\84ad4218-2311-4e45-9eb5-93bff94018d5\2dc68c9d-823e-4aae-a4ff-49c477b726b3\bin 
+"where" не является внутренней или внешней
+командой, исполняемой программой или пакетным файлом.
+"where" не является внутренней или внешней
+командой, исполняемой программой или пакетным файлом.
+Не удается найти указанный файл.
+Системе не удается найти указанный путь.
+Системе не удается найти указанный путь.
