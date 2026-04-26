@@ -10,9 +10,31 @@ import {
   telegramAuthService
 } from "@/server/services/auth/telegram-auth-service";
 import { serializeSessionUser } from "@/server/services/auth/current-user";
+import { checkRateLimit } from "@/server/services/rate-limit/in-memory-rate-limit";
 
 export async function POST(request: Request) {
   try {
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+    const rateLimit = checkRateLimit(`telegram-auth:${ip}`, {
+      limit: 40,
+      windowMs: 60_000
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: "Слишком много попыток входа. Попробуйте чуть позже." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds)
+          }
+        }
+      );
+    }
+
     const initData = request.headers.get(TELEGRAM_INIT_DATA_HEADER)?.trim();
 
     if (!initData) {

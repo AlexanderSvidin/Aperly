@@ -22,11 +22,7 @@ Purpose:
 
 Request:
 
-```json
-{
-  "initData": "raw telegram init data string"
-}
-```
+- raw Telegram init data is passed in the `x-telegram-init-data` header
 
 Response:
 
@@ -385,6 +381,7 @@ Response additions:
 Purpose:
 
 - polling endpoint for message history and deltas
+- alias: `GET /api/chats/:id/poll?cursor=...`
 
 Response shape:
 
@@ -420,6 +417,7 @@ Validation rules:
 Purpose:
 
 - send a lightweight reminder message in a stale chat
+- alias: `POST /api/chats/:id/remind`
 
 Validation rules:
 
@@ -434,12 +432,14 @@ Validation rules:
 Purpose:
 
 - initiate contact sharing
+- alias: `POST /api/chats/:id/exchange`
 
 ### `POST /api/chats/:id/contact-exchange/respond`
 
 Purpose:
 
 - accept or decline contact sharing
+- alias: `POST /api/chats/:id/exchange/respond`
 
 Request:
 
@@ -553,29 +553,13 @@ Request:
 
 ## Admin
 
-### `GET /api/admin/users`
+Admin dashboard data is currently loaded server-side by the admin page. Public admin API handlers are mutation-focused.
+
+### `POST /api/admin/users/:id/status`
 
 Purpose:
 
-- list users for moderation
-
-### `GET /api/admin/requests`
-
-Purpose:
-
-- list requests for moderation
-
-### `GET /api/admin/reports`
-
-Purpose:
-
-- list reports and statuses
-
-### `POST /api/admin/users/:id/block`
-
-Purpose:
-
-- block a user
+- block, disable, or unblock a user
 
 Backend event rules:
 
@@ -587,12 +571,6 @@ Backend event rules:
 Purpose:
 
 - resolve or close a report
-
-### `GET /api/admin/actions`
-
-Purpose:
-
-- list admin action logs
 
 ## Analytics
 

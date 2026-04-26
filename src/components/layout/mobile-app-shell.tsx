@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
 import { ShellNav } from "@/components/layout/shell-nav";
-import { TelegramStatusChip } from "@/features/telegram/components/telegram-status-chip";
 
 export function MobileAppShell({
   children,
@@ -13,16 +12,18 @@ export function MobileAppShell({
   return (
     <div className="mobile-shell">
       <header className="shell-header">
-        <div>
-          <p className="shell-kicker">Aperly</p>
+        <div className="shell-brand-row" aria-label="Aperly">
+          <span className="shell-logo-mark">A.</span>
+          <span className="shell-brand-name">Aperly</span>
+        </div>
+        <div className="shell-header-copy">
           <h1 className="shell-heading">
-            {viewerName ? `Привет, ${viewerName}` : "Подбор под конкретную цель"}
+            {viewerName ? `Привет, ${viewerName}` : "Найдём людей под цель"}
           </h1>
           <p className="shell-subheading">
-            Структурированный поиск для кейсов, проектов и совместной учёбы.
+            Кейс, проект или StudyBuddy: сначала понятный запрос, затем подходящие люди, чат и контакты только по взаимному согласию.
           </p>
         </div>
-        <TelegramStatusChip />
       </header>
 
       <main className="shell-content">{children}</main>

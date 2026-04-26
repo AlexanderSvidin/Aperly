@@ -10,6 +10,7 @@ import {
   ChatDomainError,
   chatService
 } from "@/server/services/chat/chat-service";
+import { checkRateLimit } from "@/server/services/rate-limit/in-memory-rate-limit";
 
 type RouteProps = {
   params: Promise<{ id: string }>;
@@ -54,6 +55,22 @@ export async function POST(request: Request, { params }: RouteProps) {
   try {
     const user = await requireApiUserFromRequest(request);
     const { id: chatId } = await params;
+    const rateLimit = checkRateLimit(`chat-message:${user.id}:${chatId}`, {
+      limit: 30,
+      windowMs: 60_000
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: "Слишком много сообщений. Попробуйте чуть позже." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds)
+          }
+        }
+      );
+    }
 
     const body = await request.json();
     const parsed = sendMessageBodySchema.safeParse(body);

@@ -14,7 +14,7 @@ function getStatusLabel(
     return "Режим разработки";
   }
 
-  return "Открыто вне Telegram";
+  return "Telegram не найден";
 }
 
 export function TelegramStatusChip() {

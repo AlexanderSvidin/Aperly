@@ -157,7 +157,6 @@ const matchForSessionInclude = {
   }
 } as const;
 
-type SessionRecord = Prisma.SessionGetPayload<{ include: typeof sessionInclude }>;
 type HomeSessionRecord = Prisma.SessionGetPayload<{
   include: typeof homeSessionInclude;
 }>;

@@ -10,6 +10,7 @@ import {
   RequestDomainError,
   requestService
 } from "@/server/services/requests/request-service";
+import { checkRateLimit } from "@/server/services/rate-limit/in-memory-rate-limit";
 
 function buildRequestErrorResponse(error: unknown) {
   if (error instanceof ApiUserAccessError) {
@@ -67,6 +68,23 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireApiUserFromRequest(request);
+    const rateLimit = checkRateLimit(`request-create:${user.id}`, {
+      limit: 12,
+      windowMs: 60 * 60 * 1000
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: "Слишком много попыток создать запрос. Попробуйте позже." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds)
+          }
+        }
+      );
+    }
+
     const payload = await request.json();
     const createdRequest = await requestService.create(
       {

@@ -1012,17 +1012,27 @@ export const chatService: ChatService = {
       await prisma.$transaction([
         prisma.chat.update({
           where: { id: chatId },
-          data: { contactExchangeStatus: "DECLINED" }
+          data: {
+            contactExchangeStatus: "DECLINED",
+            contactSharedAt: null
+          }
         }),
         prisma.message.create({
           data: {
             chatId,
             senderId: null,
             type: "SYSTEM",
-            text: "Обмен контактами принят. Контакты открыты."
+            text: "Обмен контактами отклонен. Контакты не открыты."
           }
         })
       ]);
+
+      await analyticsService.track("exchange_contacts", {
+        chatId,
+        matchId: chat!.matchId,
+        action: "declined",
+        userId
+      });
 
       return { status: "DECLINED" as const, revealedContacts: null };
     }

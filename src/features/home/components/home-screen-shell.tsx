@@ -33,7 +33,7 @@ const partnerGoalOptions = [
   {
     value: "hackathon",
     label: "Хакатон",
-    description: "В MVP хакатон идет через командный сценарий: роли, сроки и формат.",
+    description: "Хакатон идёт через командный сценарий: роли, сроки и формат.",
     href: "/requests/new?scenario=CASE",
     actionLabel: "Перейти к хакатону",
     tone: "sky"
@@ -444,8 +444,8 @@ export function HomeScreenShell({
             : "Главная"}
         </h2>
         <p className="screen-description">
-          Это рабочий дашборд MVP: активные запросы, свежие мэтчи, текущие чаты и
-          ближайшая StudyBuddy-встреча.
+          Здесь видны активные запросы, подходящие люди, текущие чаты и ближайшая
+          StudyBuddy-встреча.
         </p>
       </div>
 
@@ -575,7 +575,7 @@ export function HomeScreenShell({
       ) : null}
 
       {initialData.studyContinuation && continuationCopy ? (
-        <Card eyebrow="Continuation Loop" title="Что дальше по StudyBuddy">
+        <Card eyebrow="StudyBuddy" title="Что дальше по совместной учёбе">
           <div className="screen-stack">
             <div className="dashboard-row-copy">
               <div className="dashboard-row-head">

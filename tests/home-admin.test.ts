@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { after, test } from "node:test";
 
 import { prisma } from "@/server/db/client";
+import { validateTelegramInitData } from "@/server/services/auth/telegram-init-data";
+import { chatService } from "@/server/services/chat/chat-service";
 import {
   buildHomeLatestMatches,
   buildHomeRequestItem
 } from "@/server/services/home/home-presenters";
 import { homeService } from "@/server/services/home/home-service";
 import { moderationService } from "@/server/services/moderation/moderation-service";
+import { requestService } from "@/server/services/requests/request-service";
+import { studySessionService } from "@/server/services/study-sessions/study-session-service";
 
 Object.assign(process.env, { NODE_ENV: "test" });
 
@@ -220,6 +225,40 @@ async function createProjectRequest(context: TestContext, ownerId: string) {
   context.requestIds.push(request.id);
 
   return request;
+}
+
+function buildSignedTelegramInitData(params: {
+  botToken: string;
+  authDate: number;
+  user: {
+    id: number;
+    first_name: string;
+    last_name?: string;
+    username?: string;
+    language_code?: string;
+  };
+}) {
+  const searchParams = new URLSearchParams({
+    auth_date: String(params.authDate),
+    query_id: "test-query",
+    user: JSON.stringify(params.user)
+  });
+
+  const dataCheckString = [...searchParams.entries()]
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+
+  const secret = createHmac("sha256", "WebAppData")
+    .update(params.botToken)
+    .digest();
+  const hash = createHmac("sha256", secret)
+    .update(dataCheckString)
+    .digest("hex");
+
+  searchParams.set("hash", hash);
+
+  return searchParams.toString();
 }
 
 after(async () => {
@@ -568,6 +607,235 @@ test("moderationService blocks users, closes chats and resolves reports with aud
     assert.ok(
       dashboard.actions.some((action) => action.actionType === "RESOLVE_REPORT")
     );
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("validateTelegramInitData accepts signed Telegram Mini App payloads", () => {
+  const botToken = "123456:test-token";
+  const authDate = Math.floor(Date.now() / 1000);
+  const initData = buildSignedTelegramInitData({
+    botToken,
+    authDate,
+    user: {
+      id: 777001,
+      first_name: "Александр",
+      last_name: "Свидин",
+      username: "aperly_test",
+      language_code: "ru"
+    }
+  });
+
+  const validated = validateTelegramInitData({
+    botToken,
+    initData,
+    maxAgeSeconds: 60
+  });
+
+  assert.equal(validated.user.id, 777001);
+  assert.equal(validated.user.firstName, "Александр");
+  assert.equal(validated.user.username, "aperly_test");
+});
+
+test("requestService creates StudyBuddy request and recomputes R2R matches", async () => {
+  const context = buildContext("request_matching");
+
+  try {
+    const owner = await createUser(context, { firstName: "StudyOwner" });
+    const partner = await createUser(context, { firstName: "StudyPartner" });
+    const subject = await createSubject(context);
+    const partnerRequest = await createStudyRequest(context, partner.id, subject.id);
+
+    const created = await requestService.create(
+      {
+        id: owner.id,
+        status: "ACTIVE",
+        onboardingCompleted: true
+      },
+      {
+        scenario: "STUDY",
+        notes: "",
+        availabilitySlots: [],
+        details: {
+          subjectId: subject.id,
+          currentContext: `${context.prefix} preparing for seminar`,
+          goal: `${context.prefix} solve weekly tasks`,
+          desiredFrequency: "WEEKLY",
+          preferredTime: "EVENING",
+          preferredFormat: "ONLINE"
+        }
+      }
+    );
+    context.requestIds.push(created.id);
+
+    const matches = await prisma.match.findMany({
+      where: {
+        OR: [
+          { sourceRequestId: created.id },
+          { candidateRequestId: created.id }
+        ]
+      }
+    });
+    context.matchIds.push(...matches.map((match) => match.id));
+
+    assert.equal(created.details.type, "STUDY");
+    assert.ok(
+      matches.some(
+        (match) =>
+          match.mode === "REQUEST_TO_REQUEST" &&
+          (match.sourceRequestId === partnerRequest.id ||
+            match.candidateRequestId === partnerRequest.id)
+      )
+    );
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("chatService decline keeps contacts hidden and writes decline message", async () => {
+  const context = buildContext("contact_decline");
+
+  try {
+    const owner = await createUser(context, { firstName: "ContactOwner" });
+    const partner = await createUser(context, { firstName: "ContactPartner" });
+    const ownerRequest = await createProjectRequest(context, owner.id);
+    const partnerRequest = await createProjectRequest(context, partner.id);
+
+    const match = await prisma.match.create({
+      data: {
+        pairKey: `${context.prefix}_contact_pair`,
+        scenario: "PROJECT",
+        mode: "REQUEST_TO_REQUEST",
+        status: "READY",
+        sourceRequestId: ownerRequest.id,
+        candidateRequestId: partnerRequest.id,
+        score: 82,
+        reasonSummary: `${context.prefix} contact exchange reason`,
+        computedAt: new Date(),
+        expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+      }
+    });
+    context.matchIds.push(match.id);
+
+    const chat = await prisma.chat.create({
+      data: {
+        matchId: match.id,
+        userAId: owner.id,
+        userBId: partner.id,
+        status: "ACTIVE",
+        lastMessageAt: new Date(),
+        staleAfterAt: new Date(Date.now() + 72 * 60 * 60 * 1000)
+      }
+    });
+    context.chatIds.push(chat.id);
+
+    await chatService.requestContactExchange(owner.id, chat.id);
+    const result = await chatService.respondToContactExchange(
+      partner.id,
+      chat.id,
+      "DECLINE"
+    );
+
+    const storedChat = await prisma.chat.findUniqueOrThrow({
+      where: { id: chat.id },
+      select: {
+        contactExchangeStatus: true,
+        contactSharedAt: true
+      }
+    });
+
+    const lastSystemMessage = await prisma.message.findFirst({
+      where: {
+        chatId: chat.id,
+        type: "SYSTEM"
+      },
+      orderBy: { createdAt: "desc" },
+      select: { text: true }
+    });
+
+    assert.equal(result.status, "DECLINED");
+    assert.equal(result.revealedContacts, null);
+    assert.equal(storedChat.contactExchangeStatus, "DECLINED");
+    assert.equal(storedChat.contactSharedAt, null);
+    assert.match(lastSystemMessage?.text ?? "", /отклон/i);
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("studySessionService supports first session, completion and repeat scheduling", async () => {
+  const context = buildContext("study_session");
+
+  try {
+    const owner = await createUser(context, { firstName: "SessionOwner" });
+    const partner = await createUser(context, { firstName: "SessionPartner" });
+    const subject = await createSubject(context);
+    const ownerRequest = await createStudyRequest(context, owner.id, subject.id);
+    const partnerRequest = await createStudyRequest(context, partner.id, subject.id);
+
+    const match = await prisma.match.create({
+      data: {
+        pairKey: `${context.prefix}_study_pair`,
+        scenario: "STUDY",
+        mode: "REQUEST_TO_REQUEST",
+        status: "READY",
+        sourceRequestId: ownerRequest.id,
+        candidateRequestId: partnerRequest.id,
+        score: 91,
+        reasonSummary: `${context.prefix} study match`,
+        computedAt: new Date(),
+        expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+      }
+    });
+    context.matchIds.push(match.id);
+
+    const chat = await prisma.chat.create({
+      data: {
+        matchId: match.id,
+        userAId: owner.id,
+        userBId: partner.id,
+        status: "ACTIVE",
+        lastMessageAt: new Date(),
+        staleAfterAt: new Date(Date.now() + 72 * 60 * 60 * 1000)
+      }
+    });
+    context.chatIds.push(chat.id);
+
+    const firstSession = await studySessionService.scheduleFirst(owner.id, match.id, {
+      scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      format: "ONLINE",
+      notes: `${context.prefix} first session`
+    });
+    context.sessionIds.push(firstSession.id);
+
+    const confirmed = await studySessionService.updateSession(
+      partner.id,
+      firstSession.id,
+      "CONFIRM"
+    );
+    const completed = await studySessionService.updateSession(
+      owner.id,
+      firstSession.id,
+      "MARK_COMPLETED"
+    );
+    const nextSession = await studySessionService.scheduleNext(
+      owner.id,
+      firstSession.id,
+      {
+        scheduledAt: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+        format: "ONLINE",
+        notes: `${context.prefix} repeat session`
+      }
+    );
+    context.sessionIds.push(nextSession.id);
+
+    assert.equal(firstSession.status, "PROPOSED");
+    assert.equal(confirmed.status, "CONFIRMED");
+    assert.equal(completed.status, "COMPLETED");
+    assert.equal(completed.nextAction, "SCHEDULE_NEXT");
+    assert.equal(nextSession.sequenceNumber, 2);
+    assert.equal(nextSession.status, "PROPOSED");
   } finally {
     await cleanupContext(context);
   }

@@ -7,13 +7,13 @@ import type {
 } from "@/features/matching/lib/match-types";
 
 export const matchModeLabels: Record<MatchModeValue, string> = {
-  REQUEST_TO_REQUEST: "Запрос к запросу",
-  REQUEST_TO_PROFILE: "Профиль из резервного подбора"
+  REQUEST_TO_REQUEST: "У вас совпали запросы",
+  REQUEST_TO_PROFILE: "Человек подходит под запрос"
 };
 
 export const matchStatusLabels: Record<MatchStatusValue, string> = {
   READY: "Готово",
-  PENDING_RECIPIENT_ACCEPTANCE: "Нужно приглашение",
+  PENDING_RECIPIENT_ACCEPTANCE: "Нужно подтверждение",
   DECLINED: "Отклонено",
   EXPIRED: "Истекло",
   CLOSED: "Закрыто"
@@ -31,8 +31,8 @@ export const matchStatusTone: Record<
 };
 
 export const chatReadinessLabels: Record<MatchChatReadiness, string> = {
-  READY_FOR_CHAT: "Можно перейти в чат",
-  INVITE_REQUIRED: "Сначала нужно отправить приглашение"
+  READY_FOR_CHAT: "Можно писать сразу",
+  INVITE_REQUIRED: "Нужно подтверждение второй стороны"
 };
 
 export const scenarioLabelByValue = Object.fromEntries(

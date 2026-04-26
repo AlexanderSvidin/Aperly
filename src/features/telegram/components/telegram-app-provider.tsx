@@ -28,57 +28,94 @@ const defaultSession: TelegramRuntimeSession = {
 const TelegramAppContext =
   createContext<TelegramRuntimeSession>(defaultSession);
 
+const TELEGRAM_SDK_WAIT_MS = 1500;
+const TELEGRAM_SDK_POLL_MS = 50;
+
 export function TelegramAppProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<TelegramRuntimeSession>(defaultSession);
 
   useEffect(() => {
-    let timeoutId: number | null = null;
+    let sessionUpdateId: number | null = null;
+    let fallbackTimeoutId: number | null = null;
+    let intervalId: number | null = null;
     const scheduleSessionUpdate = (nextSession: TelegramRuntimeSession) => {
-      timeoutId = window.setTimeout(() => {
+      sessionUpdateId = window.setTimeout(() => {
         setSession(nextSession);
       }, 0);
     };
 
-    if (typeof window !== "undefined" && window.Telegram?.WebApp) {
+    const cleanupTimers = () => {
+      if (sessionUpdateId !== null) {
+        window.clearTimeout(sessionUpdateId);
+      }
+
+      if (fallbackTimeoutId !== null) {
+        window.clearTimeout(fallbackTimeoutId);
+      }
+
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+    };
+
+    const hydrateFromTelegram = () => {
+      if (typeof window === "undefined" || !window.Telegram?.WebApp) {
+        return false;
+      }
+
       const Telegram = window.Telegram;
       const webApp = Telegram.WebApp!;
 
-      console.log("Telegram WebApp detected", Telegram.WebApp!.initData);
-      console.log(
-        "Telegram WebApp initDataUnsafe",
-        Telegram.WebApp!.initDataUnsafe
-      );
+      console.log("Telegram WebApp detected", webApp.initData);
+      console.log("Telegram WebApp initDataUnsafe", webApp.initDataUnsafe);
 
-      Telegram.WebApp!.ready();
-      Telegram.WebApp!.expand();
+      webApp.ready();
+      webApp.expand();
       applyTelegramTheme(webApp);
 
       scheduleSessionUpdate(buildTelegramRuntimeSession(webApp));
-      return () => {
-        if (timeoutId !== null) {
-          window.clearTimeout(timeoutId);
-        }
-      };
-    }
-
-    if (
-      process.env.NODE_ENV !== "production" &&
-      clientEnv.NEXT_PUBLIC_ENABLE_DEV_TELEGRAM_FALLBACK
-    ) {
-      scheduleSessionUpdate(createDevTelegramSession());
-      return () => {
-        if (timeoutId !== null) {
-          window.clearTimeout(timeoutId);
-        }
-      };
-    }
-
-    scheduleSessionUpdate(defaultSession);
-    return () => {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
+      return true;
     };
+
+    if (hydrateFromTelegram()) {
+      return cleanupTimers;
+    }
+
+    intervalId = window.setInterval(() => {
+      if (hydrateFromTelegram()) {
+        if (intervalId !== null) {
+          window.clearInterval(intervalId);
+          intervalId = null;
+        }
+        if (fallbackTimeoutId !== null) {
+          window.clearTimeout(fallbackTimeoutId);
+          fallbackTimeoutId = null;
+        }
+      }
+    }, TELEGRAM_SDK_POLL_MS);
+
+    fallbackTimeoutId = window.setTimeout(() => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+
+      if (hydrateFromTelegram()) {
+        return;
+      }
+
+      if (
+        process.env.NODE_ENV !== "production" &&
+        clientEnv.NEXT_PUBLIC_ENABLE_DEV_TELEGRAM_FALLBACK
+      ) {
+        scheduleSessionUpdate(createDevTelegramSession());
+        return;
+      }
+
+      scheduleSessionUpdate(defaultSession);
+    }, TELEGRAM_SDK_WAIT_MS);
+
+    return cleanupTimers;
   }, []);
 
   return (

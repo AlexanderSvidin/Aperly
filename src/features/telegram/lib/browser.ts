@@ -30,7 +30,7 @@ export function buildTelegramRuntimeSession(
   return {
     source: "telegram",
     initData: webApp.initData || null,
-    user: mapTelegramUser(webApp.initDataUnsafe.user),
+    user: mapTelegramUser(webApp.initDataUnsafe?.user),
     platform: webApp.platform ?? null,
     colorScheme: webApp.colorScheme ?? "light",
     isAvailable: true

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type FormEvent,
   useEffect,
   useEffectEvent,
   useState,
@@ -19,7 +20,6 @@ import {
   contactExchangeStatusLabels,
   staleStatusLabels
 } from "@/features/chat/lib/chat-options";
-import { reportReasonOptions } from "@/features/moderation/lib/report-options";
 import { formatOptions } from "@/features/profile/lib/profile-options";
 import type {
   ScheduleSessionInput,
@@ -48,11 +48,6 @@ type FeedbackState = {
 };
 
 type StudyFormMode = "FIRST" | "RESCHEDULE" | "NEXT" | null;
-
-type ReportDraft = {
-  reasonCode: (typeof reportReasonOptions)[number]["value"];
-  details: string;
-};
 
 const formatLabelByValue = Object.fromEntries(
   formatOptions.map((option) => [option.value, option.label])
@@ -208,17 +203,31 @@ export function ChatsScreenShell({
   const [studyDraft, setStudyDraft] = useState(() =>
     buildStudyDraft(initialData.selectedChat?.studySessionPanel ?? null)
   );
-  const [showReportForm, setShowReportForm] = useState(false);
-  const [reportDraft, setReportDraft] = useState<ReportDraft>({
-    reasonCode: reportReasonOptions[0].value,
-    details: ""
-  });
 
   const selectedChatId = selectedChat?.id ?? null;
   const isThreadWritable =
     selectedChat?.status !== "BLOCKED" && selectedChat?.status !== "CLOSED";
   const selectedStudyPanel = selectedChat?.studySessionPanel ?? null;
   const selectedStudySession = selectedStudyPanel?.latestSession ?? null;
+
+  async function refreshSelectedChatMetadata() {
+    if (!selectedChatId) {
+      return;
+    }
+
+    const response = await fetch(`/api/chats/${selectedChatId}`, {
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const nextMetadata = (await response.json()) as SerializedChatMetadata;
+
+    setSelectedChat(nextMetadata);
+    setChatList((currentChats) => upsertChatPreview(currentChats, nextMetadata));
+  }
 
   const pollSelectedChat = useEffectEvent(async () => {
     if (!selectedChatId) {
@@ -287,10 +296,15 @@ export function ChatsScreenShell({
   }, [selectedChatId]);
 
   useEffect(() => {
-    setStudyFormMode(null);
-    setShowReportForm(false);
-    setStudyDraft(buildStudyDraft(selectedChat?.studySessionPanel ?? null));
-  }, [selectedChatId]);
+    const timeoutId = window.setTimeout(() => {
+      setStudyFormMode(null);
+      setStudyDraft(buildStudyDraft(selectedChat?.studySessionPanel ?? null));
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [selectedChatId, selectedChat?.studySessionPanel]);
 
   function handleSendMessage() {
     const text = composerText.trim();
@@ -566,6 +580,198 @@ export function ChatsScreenShell({
     });
   }
 
+  function openStudyForm(mode: Exclude<StudyFormMode, null>) {
+    setStudyFormMode(mode);
+    setStudyDraft(buildStudyDraft(selectedStudyPanel));
+  }
+
+  function handleSaveStudySession(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedChat || !selectedStudyPanel || !studyFormMode) {
+      return;
+    }
+
+    if (!studyDraft.scheduledAt) {
+      setFeedback({
+        kind: "error",
+        message: "Укажите дату и время StudyBuddy-встречи."
+      });
+      return;
+    }
+
+    const scheduledAt = new Date(studyDraft.scheduledAt);
+
+    if (Number.isNaN(scheduledAt.getTime())) {
+      setFeedback({
+        kind: "error",
+        message: "Проверьте дату и время StudyBuddy-встречи."
+      });
+      return;
+    }
+
+    const notes = studyDraft.notes?.trim() || undefined;
+    const payload =
+      studyFormMode === "RESCHEDULE"
+        ? {
+            action: "RESCHEDULE" as const,
+            scheduledAt: scheduledAt.toISOString(),
+            notes
+          }
+        : {
+            scheduledAt: scheduledAt.toISOString(),
+            format: studyDraft.format,
+            notes
+          };
+
+    const endpoint =
+      studyFormMode === "FIRST"
+        ? `/api/matches/${selectedChat.matchId}/session`
+        : studyFormMode === "NEXT" && selectedStudySession
+          ? `/api/sessions/${selectedStudySession.id}/schedule-next`
+          : selectedStudySession
+            ? `/api/sessions/${selectedStudySession.id}`
+            : null;
+
+    if (!endpoint) {
+      setFeedback({
+        kind: "error",
+        message: "Не удалось определить StudyBuddy-встречу для изменения."
+      });
+      return;
+    }
+
+    startTransition(async () => {
+      setFeedback(null);
+
+      const response = await fetch(endpoint, {
+        method: studyFormMode === "RESCHEDULE" ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = (await response.json().catch(() => null)) as
+        | { message?: string }
+        | null;
+
+      if (!response.ok) {
+        setFeedback({
+          kind: "error",
+          message: extractErrorMessage(
+            result,
+            "Не удалось сохранить StudyBuddy-встречу."
+          )
+        });
+        return;
+      }
+
+      setStudyFormMode(null);
+      setFeedback({
+        kind: "success",
+        message:
+          studyFormMode === "RESCHEDULE"
+            ? "StudyBuddy-встреча перенесена."
+            : "StudyBuddy-встреча запланирована."
+      });
+      await refreshSelectedChatMetadata();
+      router.refresh();
+    });
+  }
+
+  function handleStudySessionAction(action: Exclude<SessionAction, "RESCHEDULE">) {
+    if (!selectedStudySession) {
+      return;
+    }
+
+    startTransition(async () => {
+      setFeedback(null);
+
+      const response = await fetch(`/api/sessions/${selectedStudySession.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action })
+      });
+
+      const result = (await response.json().catch(() => null)) as
+        | { message?: string }
+        | null;
+
+      if (!response.ok) {
+        setFeedback({
+          kind: "error",
+          message: extractErrorMessage(
+            result,
+            "Не удалось обновить StudyBuddy-встречу."
+          )
+        });
+        return;
+      }
+
+      setFeedback({
+        kind: "success",
+        message: "StudyBuddy-встреча обновлена."
+      });
+      await refreshSelectedChatMetadata();
+      router.refresh();
+    });
+  }
+
+  function handleStudyRequestAction(action: "FIND_NEW_PARTNER" | "STOP_SEARCHING") {
+    const requestId = selectedStudyPanel?.requestId;
+
+    if (!requestId) {
+      setFeedback({
+        kind: "error",
+        message: "Для этого действия нужен активный StudyBuddy-запрос."
+      });
+      return;
+    }
+
+    const endpoint =
+      action === "FIND_NEW_PARTNER"
+        ? `/api/requests/${requestId}/find-new-partner`
+        : `/api/requests/${requestId}/stop-searching`;
+
+    startTransition(async () => {
+      setFeedback(null);
+
+      const response = await fetch(endpoint, {
+        method: "POST"
+      });
+
+      const result = (await response.json().catch(() => null)) as
+        | { message?: string }
+        | null;
+
+      if (!response.ok) {
+        setFeedback({
+          kind: "error",
+          message: extractErrorMessage(
+            result,
+            action === "FIND_NEW_PARTNER"
+              ? "Не удалось запустить поиск нового StudyBuddy."
+              : "Не удалось остановить StudyBuddy-поиск."
+          )
+        });
+        return;
+      }
+
+      setFeedback({
+        kind: "success",
+        message:
+          action === "FIND_NEW_PARTNER"
+            ? "Поиск нового StudyBuddy запущен."
+            : "StudyBuddy-поиск остановлен."
+      });
+      await refreshSelectedChatMetadata();
+      router.refresh();
+    });
+  }
+
   return (
     <div className="screen-stack">
       <section className="surface-card screen-stack">
@@ -573,8 +779,8 @@ export function ChatsScreenShell({
           <p className="card-eyebrow">Диалоги</p>
           <h2 className="screen-title">Чаты и приглашения</h2>
           <p className="screen-description">
-            Здесь продолжаются разговоры после мэтча: можно принять fallback
-            invite, написать первое сообщение, напомнить о себе и открыть
+            Здесь продолжаются разговоры после мэтча: можно принять приглашение
+            из резервного подбора, написать первое сообщение, напомнить о себе и открыть
             контакты только по взаимному согласию.
           </p>
         </div>
@@ -615,7 +821,7 @@ export function ChatsScreenShell({
             <p className="card-eyebrow">Нужно решение</p>
             <h2 className="card-title">Входящие приглашения</h2>
             <p className="card-body-copy">
-              Это fallback-подбор: сначала вы решаете, готовы ли открыть чат.
+              Это резервный подбор по открытому профилю: сначала вы решаете, готовы ли открыть чат.
             </p>
           </div>
 
@@ -810,6 +1016,234 @@ export function ChatsScreenShell({
                     </p>
                   ) : null}
                 </div>
+
+                {selectedStudyPanel ? (
+                  <div className="match-context-card study-chat-panel">
+                    <div className="screen-copy">
+                      <p className="card-eyebrow">StudyBuddy</p>
+                      <h3 className="card-title">
+                        {selectedStudyPanel.subjectName}
+                      </h3>
+                      <p className="card-body-copy">
+                        Сценарий совместной учёбы с{" "}
+                        {selectedStudyPanel.partnerName}. Встречи фиксируются здесь,
+                        чтобы после чата был понятный следующий шаг.
+                      </p>
+                    </div>
+
+                    {selectedStudySession ? (
+                      <div className="quick-goal-preview" data-tone="mint">
+                        <span
+                          className="accent-icon-badge"
+                          data-tone="mint"
+                          aria-hidden="true"
+                        >
+                          ST
+                        </span>
+                        <div className="special-card-copy">
+                          <div className="dashboard-row-head">
+                            <strong>
+                              Встреча #{selectedStudySession.sequenceNumber}
+                            </strong>
+                            <span
+                              className="tone-pill"
+                              data-tone={
+                                studySessionStatusTone[
+                                  selectedStudySession.status
+                                ]
+                              }
+                            >
+                              {
+                                studySessionStatusLabels[
+                                  selectedStudySession.status
+                                ]
+                              }
+                            </span>
+                          </div>
+                          <p className="helper-text">
+                            {formatDateTime(selectedStudySession.scheduledFor)}
+                            {" · "}
+                            {formatLabelByValue[selectedStudySession.format]}
+                          </p>
+                          {selectedStudySession.notes ? (
+                            <p className="helper-text">
+                              {selectedStudySession.notes}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="helper-text">
+                        Встреча ещё не назначена. Предложите время после первого
+                        короткого обсуждения в чате.
+                      </p>
+                    )}
+
+                    <div className="dashboard-action-grid">
+                      {selectedStudyPanel.canScheduleFirst ? (
+                        <Button
+                          disabled={isPending || !isThreadWritable}
+                          onClick={() => openStudyForm("FIRST")}
+                          type="button"
+                        >
+                          Назначить встречу
+                        </Button>
+                      ) : null}
+
+                      {selectedStudySession?.status === "PROPOSED" ? (
+                        <Button
+                          disabled={isPending || !isThreadWritable}
+                          onClick={() => handleStudySessionAction("CONFIRM")}
+                          type="button"
+                          variant="secondary"
+                        >
+                          Подтвердить
+                        </Button>
+                      ) : null}
+
+                      {selectedStudySession &&
+                      (selectedStudySession.status === "PROPOSED" ||
+                        selectedStudySession.status === "CONFIRMED") ? (
+                        <>
+                          <Button
+                            disabled={isPending || !isThreadWritable}
+                            onClick={() => openStudyForm("RESCHEDULE")}
+                            type="button"
+                            variant="secondary"
+                          >
+                            Перенести
+                          </Button>
+                          <Button
+                            disabled={isPending || !isThreadWritable}
+                            onClick={() =>
+                              handleStudySessionAction("MARK_COMPLETED")
+                            }
+                            type="button"
+                            variant="secondary"
+                          >
+                            Завершить
+                          </Button>
+                          <Button
+                            disabled={isPending || !isThreadWritable}
+                            onClick={() =>
+                              handleStudySessionAction("MARK_MISSED")
+                            }
+                            type="button"
+                            variant="ghost"
+                          >
+                            Не состоялась
+                          </Button>
+                        </>
+                      ) : null}
+
+                      {selectedStudyPanel.canScheduleNext ? (
+                        <Button
+                          disabled={isPending || !isThreadWritable}
+                          onClick={() => openStudyForm("NEXT")}
+                          type="button"
+                        >
+                          Повторить встречу
+                        </Button>
+                      ) : null}
+
+                      {selectedStudyPanel.canFindNewPartner ? (
+                        <Button
+                          disabled={isPending}
+                          onClick={() => handleStudyRequestAction("FIND_NEW_PARTNER")}
+                          type="button"
+                          variant="secondary"
+                        >
+                          Найти нового партнёра
+                        </Button>
+                      ) : null}
+
+                      {selectedStudyPanel.canStopSearching ? (
+                        <Button
+                          disabled={isPending}
+                          onClick={() => handleStudyRequestAction("STOP_SEARCHING")}
+                          type="button"
+                          variant="ghost"
+                        >
+                          Остановить поиск
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    {studyFormMode ? (
+                      <form className="screen-stack" onSubmit={handleSaveStudySession}>
+                        <div className="form-grid">
+                          <label className="field-stack">
+                            <span className="field-label">Дата и время</span>
+                            <input
+                              className="field-input"
+                              onChange={(event) =>
+                                setStudyDraft((current) => ({
+                                  ...current,
+                                  scheduledAt: event.target.value
+                                }))
+                              }
+                              type="datetime-local"
+                              value={studyDraft.scheduledAt}
+                            />
+                          </label>
+
+                          <label className="field-stack">
+                            <span className="field-label">Формат</span>
+                            <select
+                              className="field-input field-select"
+                              disabled={studyFormMode === "RESCHEDULE"}
+                              onChange={(event) =>
+                                setStudyDraft((current) => ({
+                                  ...current,
+                                  format: event.target
+                                    .value as ScheduleSessionInput["format"]
+                                }))
+                              }
+                              value={studyDraft.format}
+                            >
+                              {formatOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+
+                        <label className="field-stack">
+                          <span className="field-label">Комментарий</span>
+                          <textarea
+                            className="field-input field-textarea"
+                            maxLength={500}
+                            onChange={(event) =>
+                              setStudyDraft((current) => ({
+                                ...current,
+                                notes: event.target.value
+                              }))
+                            }
+                            placeholder="Например: разобрать задачи к семинару или созвониться онлайн"
+                            rows={3}
+                            value={studyDraft.notes ?? ""}
+                          />
+                        </label>
+
+                        <div className="card-actions-row card-actions-row-inline">
+                          <Button disabled={isPending} type="submit">
+                            Сохранить встречу
+                          </Button>
+                          <Button
+                            disabled={isPending}
+                            onClick={() => setStudyFormMode(null)}
+                            type="button"
+                            variant="ghost"
+                          >
+                            Отмена
+                          </Button>
+                        </div>
+                      </form>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="chat-message-list">
                   {selectedMessages.length === 0 ? (

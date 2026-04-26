@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-const MINI_APP_URL = "https://aperly.vercel.app";
 const START_MESSAGE =
   "Открой Aperly, чтобы найти команду для кейса, проекта или совместной учёбы";
+
+const miniAppUrlSchema = z.string().url();
 
 const telegramMessageSchema = z.object({
   chat: z.object({
@@ -27,6 +28,9 @@ function isStartCommand(text: string | undefined): boolean {
 
 async function sendStartMessage(chatId: string | number): Promise<void> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const miniAppUrl = miniAppUrlSchema.parse(
+    process.env.NEXT_PUBLIC_MINI_APP_URL ?? process.env.NEXT_PUBLIC_APP_URL
+  );
 
   if (!botToken) {
     throw new Error("TELEGRAM_BOT_TOKEN is not configured");
@@ -48,7 +52,7 @@ async function sendStartMessage(chatId: string | number): Promise<void> {
               {
                 text: "Открыть Aperly",
                 web_app: {
-                  url: MINI_APP_URL
+                  url: miniAppUrl.replace(/\/$/, "")
                 }
               }
             ]

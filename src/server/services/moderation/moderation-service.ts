@@ -463,8 +463,8 @@ export const moderationService: ModerationService = {
 
     let targetUserId = input.targetUserId ?? null;
     let matchId = input.matchId ?? null;
-    let chatId = input.chatId ?? null;
-    let requestId = input.requestId ?? null;
+    const chatId = input.chatId ?? null;
+    const requestId = input.requestId ?? null;
 
     if (!targetUserId && !matchId && !chatId && !requestId) {
       throw new ModerationDomainError({

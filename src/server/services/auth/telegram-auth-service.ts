@@ -154,11 +154,21 @@ export const telegramAuthService: TelegramAuthService = {
       });
     }
 
-    const validated = validateTelegramInitData({
-      botToken: telegramServerEnv.TELEGRAM_BOT_TOKEN,
-      initData,
-      maxAgeSeconds: telegramServerEnv.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS
-    });
+    let validated: ReturnType<typeof validateTelegramInitData>;
+
+    try {
+      validated = validateTelegramInitData({
+        botToken: telegramServerEnv.TELEGRAM_BOT_TOKEN,
+        initData,
+        maxAgeSeconds: telegramServerEnv.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS
+      });
+    } catch {
+      throw new TelegramAuthError({
+        code: "invalid_telegram_init_data",
+        message: "Telegram initData не прошёл проверку подписи. Откройте Aperly заново из Telegram.",
+        status: 401
+      });
+    }
 
     return persistIdentity({
       telegramId: BigInt(validated.user.id),

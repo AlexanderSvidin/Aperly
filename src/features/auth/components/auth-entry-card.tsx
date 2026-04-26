@@ -37,13 +37,16 @@ function getRuntimeHint(
 export function AuthEntryCard() {
   const router = useRouter();
   const telegram = useTelegramApp();
+  const liveWebApp =
+    typeof window !== "undefined" ? window.Telegram?.WebApp : null;
   const hasTelegramWebApp =
-    typeof window !== "undefined" && Boolean(window.Telegram?.WebApp);
+    Boolean(liveWebApp);
+  const telegramInitData = telegram.initData || liveWebApp?.initData || null;
   const [error, setError] = useState<AuthErrorState | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const canUseTelegramAuth =
-    telegram.source === "telegram" && Boolean(telegram.initData);
+    hasTelegramWebApp && Boolean(telegramInitData);
   const canUseDevAuth = telegram.source === "dev";
   const canAuthenticate = canUseTelegramAuth || canUseDevAuth;
 
@@ -58,8 +61,8 @@ export function AuthEntryCard() {
       const endpoint = canUseDevAuth ? "/api/auth/dev" : "/api/auth/telegram";
       const headers: HeadersInit = {};
 
-      if (canUseTelegramAuth && telegram.initData) {
-        headers[TELEGRAM_INIT_DATA_HEADER] = telegram.initData;
+      if (canUseTelegramAuth && telegramInitData) {
+        headers[TELEGRAM_INIT_DATA_HEADER] = telegramInitData;
       }
 
       const response = await fetch(endpoint, {
@@ -100,7 +103,7 @@ export function AuthEntryCard() {
         <p className="card-body-copy" suppressHydrationWarning>
           {getRuntimeHint(
             telegram.source,
-            Boolean(telegram.initData),
+            Boolean(telegramInitData),
             hasTelegramWebApp
           )}
         </p>

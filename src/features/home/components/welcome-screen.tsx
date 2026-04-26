@@ -1,6 +1,5 @@
 import { Card } from "@/components/ui/card";
 import { AuthEntryCard } from "@/features/auth/components/auth-entry-card";
-import { TelegramStatusChip } from "@/features/telegram/components/telegram-status-chip";
 
 const scenarios = [
   {
@@ -24,7 +23,6 @@ export function WelcomeScreen() {
   return (
     <section className="welcome-layout">
       <div className="hero-panel">
-        <TelegramStatusChip />
         <h1 className="hero-title">
           Найдите людей для кейса, проекта или совместной учёбы.
         </h1>
