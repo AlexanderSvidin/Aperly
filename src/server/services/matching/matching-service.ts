@@ -1383,7 +1383,7 @@ function buildRequestEmptyState(
   if (request.status !== "ACTIVE" || request.expiresAt <= new Date()) {
     return {
       code: "REQUEST_INACTIVE",
-      title: "Пока нет подходящих совпадений",
+      title: "Точные совпадения не найдены",
       description: "Оставьте запрос активным или уточните профиль, чтобы подбор стал точнее.",
       suggestions: [
         "Добавьте навыки, роли или предметы в профиль.",
@@ -1396,7 +1396,7 @@ function buildRequestEmptyState(
 
   return {
     code: "NO_MATCHES",
-    title: "Подходящих запросов пока мало",
+    title: "Подходящих запросов мало",
     description:
       "Запрос остаётся активным. Можно подождать новых участников, обновить профиль или включить больше деталей в описание.",
     suggestions: [

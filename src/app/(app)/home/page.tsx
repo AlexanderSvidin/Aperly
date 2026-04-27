@@ -23,6 +23,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     <HomeScreenShell
       initialData={initialData}
       showWelcomeSelector={resolveWelcomeFlag(resolvedSearchParams?.welcome)}
+      viewerName={user.profile?.fullName ?? user.firstName}
     />
   );
 }

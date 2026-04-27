@@ -77,7 +77,7 @@ function formatProfileMeta(match: SerializedMatchListItem) {
       : null
   ].filter(Boolean);
 
-  return parts.length > 0 ? parts.join(", ") : "Профиль пока без данных";
+  return parts.length > 0 ? parts.join(", ") : "Профиль нуждается в уточнении";
 }
 
 function renderInfoChips(values: string[], limit: number) {
@@ -215,8 +215,8 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
         {initialData.requests.length === 0 ? (
           <div className="screen-stack">
             <p className="screen-description">
-              Активных запросов пока нет. Создайте короткий запрос, чтобы
-              получить первые рекомендации.
+              Создайте короткий запрос, чтобы получить первые рекомендации
+              под конкретную цель.
             </p>
             <Link
               className={buttonClassName({
@@ -459,8 +459,8 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
             </div>
           ) : (
             <p className="helper-text">
-              Для этого мэтча пока нет детализации по критериям. Обновите
-              подбор или откройте профиль кандидата.
+              Детализация появится после следующего пересчёта. Откройте
+              профиль кандидата или обновите подбор.
             </p>
           )}
 
@@ -470,7 +470,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
               {chatReadinessLabels[selectedMatch.chatReadiness]}
             </p>
             <p className="card-body-copy">
-              Контакты пока скрыты. Сначала откройте чат и договоритесь о
+              Контакты скрыты. Сначала откройте чат и договоритесь о
               сотрудничестве, затем обменяйтесь контактами по взаимному согласию.
             </p>
           </div>

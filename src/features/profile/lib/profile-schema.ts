@@ -2,10 +2,12 @@ import { z } from "zod";
 
 import {
   MAX_AVAILABILITY_SLOTS,
+  MAX_PROFILE_LANGUAGES,
   MAX_PROFILE_SKILLS,
   MAX_PROFILE_SUBJECTS
 } from "@/features/profile/lib/profile-options";
 import {
+  type EnglishLevelId,
   studyLevelOptions,
   studyProgramOptions,
   type StudyLevelId
@@ -13,6 +15,8 @@ import {
 
 const formatValues = ["ONLINE", "OFFLINE", "HYBRID"] as const;
 const scenarioValues = ["CASE", "PROJECT", "STUDY"] as const;
+const languageValues = ["ENGLISH"] as const;
+const languageLevelValues = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 const dayOfWeekValues = [
   "MONDAY",
   "TUESDAY",
@@ -36,6 +40,11 @@ const availabilitySlotSchema = z
 
 export type ProfileAvailabilitySlot = z.infer<typeof availabilitySlotSchema>;
 
+export type ProfileLanguageSkill = {
+  language: (typeof languageValues)[number];
+  level: EnglishLevelId;
+};
+
 export type ProfileDraft = {
   fullName: string;
   bio: string;
@@ -46,6 +55,7 @@ export type ProfileDraft = {
   customSkillNames: string[];
   subjectIds: string[];
   customSubjectNames: string[];
+  languageSkills: ProfileLanguageSkill[];
   preferredFormats: (typeof formatValues)[number][];
   availabilitySlots: ProfileAvailabilitySlot[];
   isDiscoverable: boolean;
@@ -79,6 +89,14 @@ export const profileInputSchema = z
     customSubjectNames: z
       .array(z.string().trim().min(2).max(120))
       .max(MAX_PROFILE_SUBJECTS),
+    languageSkills: z
+      .array(
+        z.object({
+          language: z.enum(languageValues),
+          level: z.enum(languageLevelValues)
+        })
+      )
+      .max(MAX_PROFILE_LANGUAGES),
     preferredFormats: z.array(z.enum(formatValues)).min(1).max(formatValues.length),
     availabilitySlots: z
       .array(availabilitySlotSchema)
@@ -127,6 +145,14 @@ export const profileInputSchema = z
       });
     }
 
+    if (new Set(value.languageSkills.map((skill) => skill.language)).size !== value.languageSkills.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["languageSkills"],
+        message: "Каждый язык можно указать только один раз."
+      });
+    }
+
     if (value.studyLevel === "MASTER" && value.courseYear > 2) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -158,6 +184,7 @@ export const profileInputSchema = z
     bio: value.bio.trim(),
     customSkillNames: [...new Set(value.customSkillNames.map(normalizeSkillName))],
     customSubjectNames: [...new Set(value.customSubjectNames.map(normalizeSubjectName))],
+    languageSkills: [...value.languageSkills],
     discoverableScenarios: [...new Set(value.discoverableScenarios)],
     preferredFormats: [...new Set(value.preferredFormats)],
     skillIds: [...new Set(value.skillIds)],

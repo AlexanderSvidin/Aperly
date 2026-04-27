@@ -779,7 +779,7 @@ export function ChatsScreenShell({
           <p className="card-eyebrow">Диалоги</p>
           <h2 className="screen-title">Чаты и приглашения</h2>
           <p className="screen-description">
-            Здесь продолжаются разговоры после мэтча: можно принять приглашение
+            Разговоры после мэтча помогают принять решение: можно принять приглашение
             из резервного подбора, написать первое сообщение, напомнить о себе и открыть
             контакты только по взаимному согласию.
           </p>
@@ -800,8 +800,8 @@ export function ChatsScreenShell({
         {chatList.length === 0 && pendingInvites.length === 0 ? (
           <div className="screen-stack">
             <p className="screen-description">
-              Пока нет активных диалогов и входящих приглашений. Откройте мэтчи
-              и начните разговор с подходящим человеком.
+              Откройте мэтчи и начните разговор с подходящим человеком.
+              Первый чат станет центром решения: роли, время, контакты.
             </p>
             <Link
               className={buttonClassName({
@@ -1026,7 +1026,7 @@ export function ChatsScreenShell({
                       </h3>
                       <p className="card-body-copy">
                         Сценарий совместной учёбы с{" "}
-                        {selectedStudyPanel.partnerName}. Встречи фиксируются здесь,
+                        {selectedStudyPanel.partnerName}. Встречи фиксируются в чате,
                         чтобы после чата был понятный следующий шаг.
                       </p>
                     </div>
@@ -1249,7 +1249,8 @@ export function ChatsScreenShell({
                   {selectedMessages.length === 0 ? (
                     <div className="chat-empty-state">
                       <p className="helper-text">
-                        История пока пустая. Начните разговор первым сообщением.
+                        Начните разговор первым сообщением: цель, роли, удобное
+                        время и следующий шаг.
                       </p>
                     </div>
                   ) : (

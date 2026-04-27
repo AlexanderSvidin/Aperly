@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   MAX_AVAILABILITY_SLOTS,
+  MAX_PROFILE_LANGUAGES,
   MAX_PROFILE_SKILLS,
   MAX_PROFILE_SUBJECTS,
   dayOfWeekOptions,
@@ -17,10 +18,15 @@ import {
 } from "@/features/profile/lib/profile-options";
 import type {
   ProfileAvailabilitySlot,
-  ProfileDraft
+  ProfileDraft,
+  ProfileLanguageSkill
 } from "@/features/profile/lib/profile-schema";
 import { StudySubjectPicker } from "@/features/study/components/study-subject-picker";
-import { type StudyLevelId } from "@/features/study/lib/study-catalog";
+import {
+  englishLevelOptions,
+  type EnglishLevelId,
+  type StudyLevelId
+} from "@/features/study/lib/study-catalog";
 
 type SkillLookupItem = {
   id: string;
@@ -35,8 +41,7 @@ type SubjectLookupItem = {
   levelId: "BACHELOR" | "MASTER" | null;
   programId: string | null;
   courseYear: number | null;
-  kind: "PROGRAM" | "ENGLISH" | "CUSTOM" | "OTHER";
-  englishLevel: "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null;
+  kind: "PROGRAM" | "CUSTOM" | "OTHER";
   searchText: string;
 };
 
@@ -153,6 +158,9 @@ export function ProfileForm({ initialValues, lookups, mode }: ProfileFormProps) 
   const [customSubjectNames, setCustomSubjectNames] = useState(
     initialValues.customSubjectNames
   );
+  const [languageSkills, setLanguageSkills] = useState(
+    initialValues.languageSkills
+  );
   const [preferredFormats, setPreferredFormats] = useState(
     initialValues.preferredFormats
   );
@@ -234,6 +242,26 @@ export function ProfileForm({ initialValues, lookups, mode }: ProfileFormProps) 
     setCustomSkillName("");
   }
 
+  function toggleEnglishLevel(level: EnglishLevelId) {
+    setLanguageSkills((current) => {
+      const existing = current.find((skill) => skill.language === "ENGLISH");
+
+      if (existing?.level === level) {
+        return current.filter((skill) => skill.language !== "ENGLISH");
+      }
+
+      const nextSkill: ProfileLanguageSkill = {
+        language: "ENGLISH",
+        level
+      };
+
+      return [
+        nextSkill,
+        ...current.filter((skill) => skill.language !== "ENGLISH")
+      ].slice(0, MAX_PROFILE_LANGUAGES);
+    });
+  }
+
   function updateAvailability(
     slotId: string,
     field: keyof Omit<AvailabilityDraft, "id">,
@@ -303,6 +331,7 @@ export function ProfileForm({ initialValues, lookups, mode }: ProfileFormProps) 
         customSkillNames,
         subjectIds,
         customSubjectNames,
+        languageSkills,
         preferredFormats,
         availabilitySlots: availabilitySlots.map((slot) => ({
           dayOfWeek: slot.dayOfWeek,
@@ -438,6 +467,49 @@ export function ProfileForm({ initialValues, lookups, mode }: ProfileFormProps) 
           studyLevel={studyLevel}
           subjects={lookups.subjects}
         />
+      </div>
+
+      <div className="surface-card screen-stack">
+        <div className="card-header">
+          <p className="card-eyebrow">Языки</p>
+          <h2 className="card-title">Английский отдельно от предметов</h2>
+        </div>
+
+        <p className="helper-text">
+          Английский не участвует в списке учебных предметов. Укажите уровень
+          как отдельный языковой навык, чтобы не смешивать дисциплины и языки.
+        </p>
+
+        <div className="english-level-grid">
+          {englishLevelOptions.map((option) => {
+            const selected = languageSkills.some(
+              (skill) =>
+                skill.language === "ENGLISH" && skill.level === option.value
+            );
+
+            return (
+              <button
+                key={option.value}
+                className="english-level-chip"
+                data-selected={selected}
+                onClick={() => toggleEnglishLevel(option.value)}
+                type="button"
+              >
+                <span
+                  className="accent-icon-badge"
+                  data-tone={selected ? "violet" : "blue"}
+                  aria-hidden="true"
+                >
+                  {option.value}
+                </span>
+                <span className="english-level-copy">
+                  <strong>{option.label}</strong>
+                  <small>{selected ? "Выбран" : "Добавить уровень"}</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="surface-card screen-stack">
@@ -655,7 +727,7 @@ export function ProfileForm({ initialValues, lookups, mode }: ProfileFormProps) 
             type="checkbox"
           />
           <span>
-            Показывать мой профиль, если активных подходящих запросов пока мало
+            Показывать мой профиль, когда активных подходящих запросов мало
           </span>
         </label>
 

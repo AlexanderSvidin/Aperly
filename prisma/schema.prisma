@@ -93,6 +93,19 @@ enum PreferredTime {
   FLEXIBLE
 }
 
+enum Language {
+  ENGLISH
+}
+
+enum LanguageLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
 enum RequestStatus {
   ACTIVE
   EXPIRED
@@ -180,6 +193,7 @@ model User {
   verifications        Verification[]
   userSkills           UserSkill[]
   userSubjects         UserSubject[]
+  languageSkills       LanguageSkill[]
   requests             Request[]     @relation("RequestOwner")
   sentMessages         Message[]     @relation("MessageSender")
   chatsAsUserA         Chat[]        @relation("ChatUserA")
@@ -276,6 +290,18 @@ model UserSubject {
 
   @@id([userId, subjectId])
   @@index([subjectId])
+}
+
+model LanguageSkill {
+  userId    String        @db.Uuid
+  language  Language
+  level     LanguageLevel
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, language])
+  @@index([language, level])
 }
 
 model Request {

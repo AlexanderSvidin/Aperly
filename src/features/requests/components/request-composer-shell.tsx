@@ -35,8 +35,7 @@ type SubjectOption = {
   levelId: "BACHELOR" | "MASTER" | null;
   programId: string | null;
   courseYear: number | null;
-  kind: "PROGRAM" | "ENGLISH" | "CUSTOM" | "OTHER";
-  englishLevel: "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null;
+  kind: "PROGRAM" | "CUSTOM" | "OTHER";
   searchText: string;
 };
 
@@ -672,10 +671,10 @@ export function RequestComposerShell({
   return (
     <section className="screen-stack">
       <div className="screen-copy">
-        <h1 className="screen-title">Создать</h1>
+        <h1 className="screen-title">Создать запрос</h1>
         <p className="screen-description">
-          Один активный запрос на каждый сценарий. Выберите, кого вы хотите
-          найти, и заполните короткую форму.
+          Шаг 1 из 2 · задайте цель, роли, формат и время. Один активный
+          запрос на каждый сценарий.
         </p>
       </div>
 
@@ -1321,8 +1320,8 @@ export function RequestComposerShell({
       <Card eyebrow="История" title="Ваши запросы">
         {requests.length === 0 ? (
           <p className="card-body-copy">
-            Запросов пока нет. Создайте первый, чтобы получить подбор по
-            выбранному сценарию.
+            Создайте первый запрос, чтобы получить подбор по выбранному
+            сценарию и сразу перейти к кандидатам.
           </p>
         ) : (
           <div className="request-history-list">

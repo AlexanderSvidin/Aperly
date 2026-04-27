@@ -69,6 +69,7 @@ type PartnerGoalValue = (typeof partnerGoalOptions)[number]["value"];
 type HomeScreenShellProps = {
   initialData: SerializedHomeDashboardData;
   showWelcomeSelector?: boolean;
+  viewerName: string;
 };
 
 type FeedbackState = {
@@ -199,7 +200,8 @@ function buildInitialScheduleState(continuation: SerializedStudyContinuation | n
 
 export function HomeScreenShell({
   initialData,
-  showWelcomeSelector = false
+  showWelcomeSelector = false,
+  viewerName
 }: HomeScreenShellProps) {
   const router = useRouter();
   const [selectedGoalValue, setSelectedGoalValue] = useState<PartnerGoalValue>(
@@ -215,6 +217,11 @@ export function HomeScreenShell({
   const selectedGoal =
     partnerGoalOptions.find((goal) => goal.value === selectedGoalValue) ??
     partnerGoalOptions[0];
+  const activeRequest = initialData.activeRequests[0] ?? null;
+  const readyMatchCount = initialData.latestMatches.length;
+  const candidateInitials = initialData.latestMatches
+    .slice(0, 4)
+    .map((match) => match.candidateName.trim().slice(0, 1).toUpperCase());
   const continuationCopy = initialData.studyContinuation
     ? studyRecommendedActionCopy[initialData.studyContinuation.recommendedAction]
     : null;
@@ -437,17 +444,43 @@ export function HomeScreenShell({
 
   return (
     <section className="screen-stack">
-      <div className="screen-copy">
-        <h2 className="screen-title">
-          {showWelcomeSelector
-            ? "Профиль готов. Для чего ищем напарника?"
-            : "Главная"}
-        </h2>
-        <p className="screen-description">
-          Здесь видны активные запросы, подходящие люди, текущие чаты и ближайшая
-          StudyBuddy-встреча.
-        </p>
-      </div>
+      <section className="home-hero">
+        <div className="screen-copy">
+          <h1 className="hero-title">Привет, {viewerName}</h1>
+          <p className="hero-description">
+            {activeRequest
+              ? `Команда почти собрана — осталось закрыть роли по «${activeRequest.title}».`
+              : "Создайте запрос под кейс, проект или совместную учёбу — Aperly подберёт людей по цели, ролям и времени."}
+          </p>
+        </div>
+        <Link
+          className="home-cta-banner"
+          href={
+            initialData.latestMatches[0]
+              ? buildMatchesHref(
+                  initialData.latestMatches[0].requestId,
+                  initialData.latestMatches[0].id
+                )
+              : initialData.primaryCta.href
+          }
+        >
+          <span className="home-cta-icon" aria-hidden="true">
+            ◦
+          </span>
+          <span>
+            <strong>
+              {initialData.latestMatches.length > 0
+                ? "Написать подходящим кандидатам"
+                : "Создать первый запрос"}
+            </strong>
+            <small>
+              {initialData.latestMatches.length > 0
+                ? "Обычно отвечают в течение 5 минут"
+                : "CASE, PROJECT и STUDY доступны в одной форме"}
+            </small>
+          </span>
+        </Link>
+      </section>
 
       {feedback ? (
         <div
@@ -505,19 +538,51 @@ export function HomeScreenShell({
         </Card>
       ) : null}
 
-      <Card eyebrow="Главное действие" title={initialData.primaryCta.label}>
-        <div className="screen-stack">
-          <p className="card-body-copy">
-            Aperly работает вокруг коротких структурированных запросов. Новый
-            сценарий можно открыть в пару шагов.
-          </p>
-          <Link
-            className={buttonClassName({ fullWidth: true })}
-            href={initialData.primaryCta.href}
-          >
-            {initialData.primaryCta.label}
-          </Link>
-        </div>
+      <Card eyebrow="Твой активный запрос" title={activeRequest?.title ?? "Запрос под цель"}>
+        {activeRequest ? (
+          <div className="active-request-card">
+            <div className="active-request-icon" aria-hidden="true">
+              {activeRequest.scenario === "CASE"
+                ? "C"
+                : activeRequest.scenario === "PROJECT"
+                  ? "P"
+                  : "S"}
+            </div>
+            <div className="active-request-copy">
+              <span className="status-pill">
+                {scenarioLabelByValue[activeRequest.scenario]}
+              </span>
+              <p className="card-body-copy">{activeRequest.subtitle}</p>
+              <p className="helper-text">
+                Дедлайн поиска: {formatRequestDate(activeRequest.expiresAt)}
+              </p>
+            </div>
+            <div className="request-avatar-stack" aria-label="Кандидаты">
+              {candidateInitials.length > 0 ? (
+                candidateInitials.map((initial, index) => (
+                  <span key={`${initial}-${index}`} className="mini-avatar">
+                    {initial}
+                  </span>
+                ))
+              ) : (
+                <span className="mini-avatar muted">+</span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="screen-stack">
+            <p className="card-body-copy">
+              Начните с короткого запроса: укажите событие, проект или учебный
+              предмет, роли и удобное время.
+            </p>
+            <Link
+              className={buttonClassName({ fullWidth: true })}
+              href={initialData.primaryCta.href}
+            >
+              {initialData.primaryCta.label}
+            </Link>
+          </div>
+        )}
       </Card>
 
       {initialData.upcomingStudySession ? (
@@ -694,8 +759,8 @@ export function HomeScreenShell({
         {initialData.activeRequests.length === 0 ? (
           <div className="screen-stack">
             <p className="card-body-copy">
-              Пока нет активных запросов. Начните с одного короткого сценария, и
-              Home превратится в рабочий экран с матчами и чатами.
+              Начните с одного короткого сценария, и Home превратится в рабочий
+              экран с матчами и чатами.
             </p>
             <Link
               className={buttonClassName({ fullWidth: true })}
@@ -751,12 +816,27 @@ export function HomeScreenShell({
         )}
       </Card>
 
-      <Card eyebrow="Подбор" title="Последние мэтчи">
+      <Card
+        eyebrow="Подбор"
+        title={
+          readyMatchCount > 0
+            ? `${readyMatchCount} человека готовы сейчас`
+            : "Подбор готов к запуску"
+        }
+      >
         {initialData.latestMatches.length === 0 ? (
-          <p className="card-body-copy">
-            Как только по активным запросам появятся результаты, они сразу
-            появятся здесь.
-          </p>
+          <div className="screen-stack">
+            <p className="card-body-copy">
+              Уточните цель, роли, формат и доступное время — так первые
+              кандидаты появятся быстрее.
+            </p>
+            <Link
+              className={buttonClassName({ fullWidth: true, variant: "secondary" })}
+              href="/requests/new"
+            >
+              Улучшить запрос
+            </Link>
+          </div>
         ) : (
           <div className="dashboard-list">
             {initialData.latestMatches.map((match) => (
@@ -800,12 +880,23 @@ export function HomeScreenShell({
         )}
       </Card>
 
-      <Card eyebrow="Чаты" title="Активные диалоги">
+      <Card eyebrow="Чаты" title="Диалоги и следующий шаг">
         {initialData.activeChats.length === 0 ? (
-          <p className="card-body-copy">
-            Активных чатов пока нет. Сначала откройте мэтч или отправьте
-            приглашение из подбора.
-          </p>
+          <div className="chat-action-strip">
+            <div>
+              <strong>Начните с 1–2 кандидатов</strong>
+              <p className="helper-text">
+                Обсудите цель, роли и время, затем открывайте контакты только
+                по взаимному согласию.
+              </p>
+            </div>
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/matches"
+            >
+              Открыть мэтчи
+            </Link>
+          </div>
         ) : (
           <div className="dashboard-list">
             {initialData.activeChats.map((chat) => (
@@ -827,7 +918,7 @@ export function HomeScreenShell({
                       : "диалог только открылся"}
                   </p>
                   <p className="card-body-copy">
-                    {chat.lastMessagePreview ?? "Пока без сообщений, но чат уже готов."}
+                    {chat.lastMessagePreview ?? "Чат готов к первому сообщению."}
                   </p>
                 </div>
 

@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 
+import Image from "next/image";
+
 import { ShellNav } from "@/components/layout/shell-nav";
 
 export function MobileAppShell({
-  children,
-  viewerName
+  children
 }: {
   children: ReactNode;
   viewerName?: string;
@@ -13,16 +14,14 @@ export function MobileAppShell({
     <div className="mobile-shell">
       <header className="shell-header">
         <div className="shell-brand-row" aria-label="Aperly">
-          <span className="shell-logo-mark">A.</span>
-          <span className="shell-brand-name">Aperly</span>
-        </div>
-        <div className="shell-header-copy">
-          <h1 className="shell-heading">
-            {viewerName ? `Привет, ${viewerName}` : "Найдём людей под цель"}
-          </h1>
-          <p className="shell-subheading">
-            Кейс, проект или StudyBuddy: сначала понятный запрос, затем подходящие люди, чат и контакты только по взаимному согласию.
-          </p>
+          <Image
+            alt="Aperly"
+            className="shell-logo-image"
+            height={36}
+            priority
+            src="/aperly-logo.png"
+            width={128}
+          />
         </div>
       </header>
 

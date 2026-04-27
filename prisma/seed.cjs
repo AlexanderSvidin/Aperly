@@ -23,10 +23,6 @@ const subjectSeeds = [
     slug: subject.slug,
     name: subject.name
   })),
-  ...studyCatalog.englishLevels.map((subject) => ({
-    slug: subject.slug,
-    name: subject.name
-  })),
   { slug: "statistics", name: "Статистика" },
   { slug: "programming", name: "Программирование" },
   { slug: "finance", name: "Финансы" },
@@ -1006,6 +1002,14 @@ function buildUserCreateData(user) {
           }
         }
       }))
+    },
+    languageSkills: {
+      create: (user.languageSkills ?? [{ language: "ENGLISH", level: "B1" }]).map(
+        (languageSkill) => ({
+          language: languageSkill.language,
+          level: languageSkill.level
+        })
+      )
     }
   };
 }

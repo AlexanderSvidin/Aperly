@@ -109,13 +109,6 @@
       "courseYear": 1
     },
     {
-      "slug": "english-course",
-      "name": "English",
-      "levelId": "BACHELOR",
-      "programId": "ba-international-business-economics",
-      "courseYear": 1
-    },
-    {
       "slug": "linear-algebra",
       "name": "Линейная алгебра",
       "levelId": "BACHELOR",
@@ -229,7 +222,7 @@
     },
     {
       "slug": "external-digital-competencies-final-control-2",
-      "name": "Внешнее измерение цифровых компетенций. Итоговый контроль",
+      "name": "Внешнее измерение цифровых компетенций. Итоговый контроль, 2 курс",
       "levelId": "BACHELOR",
       "programId": "ba-international-business-economics",
       "courseYear": 2
@@ -355,7 +348,7 @@
     },
     {
       "slug": "external-digital-competencies-final-control-3",
-      "name": "Внешнее измерение цифровых компетенций. Итоговый контроль",
+      "name": "Внешнее измерение цифровых компетенций. Итоговый контроль, 3 курс",
       "levelId": "BACHELOR",
       "programId": "ba-international-business-economics",
       "courseYear": 3
@@ -419,13 +412,6 @@
     {
       "slug": "independent-data-ai-generative-models-exam-basic",
       "name": "Независимый экзамен по анализу данных, искусственному интеллекту и генеративным моделям. Базовый уровень",
-      "levelId": "BACHELOR",
-      "programId": "ba-international-business-economics",
-      "courseYear": 3
-    },
-    {
-      "slug": "independent-english-exam",
-      "name": "Independent English Exam",
       "levelId": "BACHELOR",
       "programId": "ba-international-business-economics",
       "courseYear": 3

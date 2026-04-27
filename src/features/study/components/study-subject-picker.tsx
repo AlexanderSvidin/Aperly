@@ -4,11 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
-  englishLevelOptions,
   getCourseOptionsForProgram,
   getProgramsForLevel,
   studyLevelOptions,
-  type EnglishLevelId,
   type StudyLevelId,
   type StudySubjectLookup
 } from "@/features/study/lib/study-catalog";
@@ -27,33 +25,6 @@ type StudySubjectPickerProps = {
   onStudyLevelChange: (value: StudyLevelId) => void;
   onProgramIdChange: (value: string) => void;
   onCourseYearChange: (value: number) => void;
-};
-
-const englishLevelVisuals: Record<EnglishLevelId, { caption: string; tone: string }> = {
-  A1: {
-    caption: "Старт",
-    tone: "mint"
-  },
-  A2: {
-    caption: "База",
-    tone: "sage"
-  },
-  B1: {
-    caption: "Уверенно",
-    tone: "sky"
-  },
-  B2: {
-    caption: "Свободнее",
-    tone: "blue"
-  },
-  C1: {
-    caption: "Продвинуто",
-    tone: "violet"
-  },
-  C2: {
-    caption: "Профи",
-    tone: "rose"
-  }
 };
 
 function normalizeSearch(value: string) {
@@ -96,7 +67,6 @@ export function StudySubjectPicker({
   onCourseYearChange
 }: StudySubjectPickerProps) {
   const [query, setQuery] = useState("");
-  const [englishLevel, setEnglishLevel] = useState<EnglishLevelId>("B1");
   const [customSubjectName, setCustomSubjectName] = useState("");
 
   const availablePrograms = useMemo(
@@ -152,11 +122,6 @@ export function StudySubjectPicker({
     );
   }, [normalizedQuery, programSubjects]);
 
-  const englishSubjects = useMemo(
-    () => subjects.filter((subject) => subject.kind === "ENGLISH"),
-    [subjects]
-  );
-
   const selectedSubjectMap = useMemo(
     () => new Map(subjects.map((subject) => [subject.id, subject])),
     [subjects]
@@ -181,18 +146,6 @@ export function StudySubjectPicker({
     onSelectedSubjectIdsChange(
       selectedSubjectIds.filter((currentSubjectId) => currentSubjectId !== subjectId)
     );
-  }
-
-  function addEnglishSubject() {
-    const englishSubject = englishSubjects.find(
-      (subject) => subject.englishLevel === englishLevel
-    );
-
-    if (!englishSubject) {
-      return;
-    }
-
-    selectSubject(englishSubject.id);
   }
 
   function addCustomSubject() {
@@ -310,59 +263,12 @@ export function StudySubjectPicker({
         <div className="subject-empty-state">
           <p className="helper-text">
             По выбранной программе и курсу подходящий предмет не найден. Можно
-            выбрать английский или указать свой предмет.
+            указать свой академический предмет.
           </p>
         </div>
       )}
 
       <div className="study-special-actions">
-        <div className="study-special-card">
-          <div className="special-card-head">
-            <span className="accent-icon-badge" data-tone="blue" aria-hidden="true">
-              EN
-            </span>
-            <div className="special-card-copy">
-              <span className="field-label">English</span>
-            </div>
-          </div>
-          <div className="english-level-grid">
-            {englishLevelOptions.map((option) => {
-              const visual = englishLevelVisuals[option.value];
-
-              return (
-                <button
-                  key={option.value}
-                  className="english-level-chip"
-                  data-selected={englishLevel === option.value}
-                  data-tone={visual.tone}
-                  onClick={() => setEnglishLevel(option.value)}
-                  type="button"
-                >
-                  <span
-                    className="accent-icon-badge"
-                    data-tone={visual.tone}
-                    aria-hidden="true"
-                  >
-                    {option.value}
-                  </span>
-                  <span className="english-level-copy">
-                    <strong>{option.label}</strong>
-                    <small>{visual.caption}</small>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <Button
-            disabled={totalSelectedCount >= maxSelection && mode === "multiple"}
-            onClick={addEnglishSubject}
-            type="button"
-            variant="secondary"
-          >
-            Добавить
-          </Button>
-        </div>
-
         <div className="study-special-card">
           <div className="special-card-copy">
             <span className="field-label">Своё</span>
@@ -396,7 +302,7 @@ export function StudySubjectPicker({
         <span className="field-label">Выбрано</span>
         {selectedSubjectIds.length === 0 && selectedCustomSubjects.length === 0 ? (
           <p className="helper-text">
-            Выберите предмет из каталога, English по уровню или свой вариант.
+            Выберите предмет из каталога или добавьте свой академический предмет.
           </p>
         ) : (
           <div className="selected-subject-list">

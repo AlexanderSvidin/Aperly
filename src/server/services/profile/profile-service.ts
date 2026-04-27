@@ -48,8 +48,7 @@ export interface ProfileEditorData {
       levelId: "BACHELOR" | "MASTER" | null;
       programId: string | null;
       courseYear: number | null;
-      kind: "PROGRAM" | "ENGLISH" | "CUSTOM" | "OTHER";
-      englishLevel: "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | null;
+      kind: "PROGRAM" | "CUSTOM" | "OTHER";
       searchText: string;
     }[];
   };
@@ -122,6 +121,12 @@ export const profileService = {
                 }
               }
             }
+          },
+          languageSkills: {
+            select: {
+              language: true,
+              level: true
+            }
           }
         }
       }),
@@ -158,6 +163,10 @@ export const profileService = {
         customSubjectNames: selectedSubjects
           .filter((subject) => subject.slug.startsWith("custom-"))
           .map((subject) => subject.name),
+        languageSkills: user.languageSkills.map((languageSkill) => ({
+          language: languageSkill.language,
+          level: languageSkill.level
+        })),
         preferredFormats: user.profile?.preferredFormats ?? [],
         availabilitySlots:
           user.profile?.availabilitySlots.map((slot) => ({
@@ -209,6 +218,12 @@ export const profileService = {
                   slug: true
                 }
               }
+            }
+          },
+          languageSkills: {
+            select: {
+              language: true,
+              level: true
             }
           }
         }
@@ -320,6 +335,11 @@ export const profileService = {
           where: {
             profileId: profile.id
           }
+        }),
+        transaction.languageSkill.deleteMany({
+          where: {
+            userId
+          }
         })
       ]);
 
@@ -337,6 +357,16 @@ export const profileService = {
           data: resolvedSubjectIds.map((subjectId) => ({
             userId,
             subjectId
+          }))
+        });
+      }
+
+      if (input.languageSkills.length > 0) {
+        await transaction.languageSkill.createMany({
+          data: input.languageSkills.map((languageSkill) => ({
+            userId,
+            language: languageSkill.language,
+            level: languageSkill.level
           }))
         });
       }

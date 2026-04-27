@@ -9,6 +9,16 @@ import {
 type SubjectClient = Pick<typeof prisma, "subject">;
 
 const catalogSubjectSeeds = buildSubjectSeedData();
+const languageSubjectSlugs = [
+  "english-a1",
+  "english-a2",
+  "english-b1",
+  "english-b2",
+  "english-c1",
+  "english-c2",
+  "english-course",
+  "independent-english-exam"
+];
 
 function normalizeCustomSubjectName(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -65,6 +75,11 @@ export async function loadStudySubjectLookups(
   await syncStudyCatalogSubjects(client);
 
   const subjects = await client.subject.findMany({
+    where: {
+      slug: {
+        notIn: languageSubjectSlugs
+      }
+    },
     orderBy: {
       name: "asc"
     },

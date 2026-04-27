@@ -24,8 +24,7 @@ export type StudySubjectLookup = {
   levelId: StudyLevelId | null;
   programId: string | null;
   courseYear: number | null;
-  kind: "PROGRAM" | "ENGLISH" | "CUSTOM" | "OTHER";
-  englishLevel: EnglishLevelId | null;
+  kind: "PROGRAM" | "CUSTOM" | "OTHER";
   searchText: string;
 };
 
@@ -59,17 +58,6 @@ const subjectMetaBySlug = new Map(
   studyCatalogSubjects.map((subject) => [subject.slug, subject])
 );
 
-const englishMetaBySlug = new Map(
-  studyCatalog.englishLevels.map((entry) => [
-    entry.slug,
-    {
-      slug: entry.slug,
-      name: entry.name,
-      englishLevel: entry.level as EnglishLevelId
-    }
-  ])
-);
-
 const programById = new Map(studyProgramOptions.map((program) => [program.id, program]));
 
 const legacyProgramMap: Record<string, string> = {
@@ -86,8 +74,6 @@ const legacyProgramMap: Record<string, string> = {
 
 const subjectSearchAliases: Record<string, string> = {
   "business-ethics-sustainability": "этика бизнеса устойчивое развитие",
-  "english-course": "английский английский язык",
-  "independent-english-exam": "английский независимый экзамен",
   "marketing": "маркетинг",
   "machine-learning-economics-finance": "машинное обучение экономика финансы",
   "strategic-management": "стратегический менеджмент",
@@ -177,7 +163,6 @@ export function enrichSubjectLookup(subject: {
   name: string;
 }): StudySubjectLookup {
   const programMeta = subjectMetaBySlug.get(subject.slug);
-  const englishMeta = englishMetaBySlug.get(subject.slug);
 
   if (programMeta) {
     return {
@@ -186,22 +171,9 @@ export function enrichSubjectLookup(subject: {
       programId: programMeta.programId,
       courseYear: programMeta.courseYear,
       kind: "PROGRAM",
-      englishLevel: null,
       searchText: normalizeSearchText(
         `${subject.name} ${programMeta.name} ${subjectSearchAliases[subject.slug] ?? ""}`
       )
-    };
-  }
-
-  if (englishMeta) {
-    return {
-      ...subject,
-      levelId: null,
-      programId: null,
-      courseYear: null,
-      kind: "ENGLISH",
-      englishLevel: englishMeta.englishLevel,
-      searchText: normalizeSearchText(`${subject.name} английский ${englishMeta.englishLevel}`)
     };
   }
 
@@ -211,22 +183,15 @@ export function enrichSubjectLookup(subject: {
     programId: null,
     courseYear: null,
     kind: subject.slug.startsWith("custom-") ? "CUSTOM" : "OTHER",
-    englishLevel: null,
     searchText: normalizeSearchText(subject.name)
   };
 }
 
 export function buildSubjectSeedData() {
-  return [
-    ...studyCatalogSubjects.map((subject) => ({
-      slug: subject.slug,
-      name: subject.name
-    })),
-    ...studyCatalog.englishLevels.map((entry) => ({
-      slug: entry.slug,
-      name: entry.name
-    }))
-  ];
+  return studyCatalogSubjects.map((subject) => ({
+    slug: subject.slug,
+    name: subject.name
+  }));
 }
 
 export function createCustomSubjectSlug(name: string) {
