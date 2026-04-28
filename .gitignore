@@ -25,3 +25,5 @@ prisma/*.db-journal
 # misc
 .DS_Store
 coverage
+
+.vercel
