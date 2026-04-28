@@ -47,16 +47,13 @@ select {
 
 .welcome-layout,
 .mobile-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
   margin: 0 auto;
   max-width: var(--max-content-width);
   min-height: 100vh;
   padding: 18px 18px calc(136px + env(safe-area-inset-bottom, 0px));
-}
-
-.mobile-shell {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
 }
 
 .shell-content {

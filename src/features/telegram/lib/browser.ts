@@ -42,6 +42,15 @@ export function applyTelegramTheme(webApp: TelegramWebApp): void {
     return;
   }
 
+  // Match the Telegram native header / bottom bar to the app background so
+  // they don't appear as a white block above the page content.
+  try {
+    webApp.setHeaderColor?.("#f7f4ed");
+    webApp.setBackgroundColor?.("#f7f4ed");
+  } catch {
+    // setHeaderColor / setBackgroundColor may be absent in older clients — ignore
+  }
+
   const root = document.documentElement;
   const themeParams = webApp.themeParams ?? {};
 

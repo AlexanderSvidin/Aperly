@@ -45,8 +45,12 @@ export function AuthEntryCard() {
   const [error, setError] = useState<AuthErrorState | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const canUseTelegramAuth =
-    hasTelegramWebApp && Boolean(telegramInitData);
+  // Enable as soon as the Telegram WebApp object is present.
+  // We do NOT gate on initData here because webApp.initData can legitimately
+  // be an empty string "" on first render (treated as falsy by ||), which
+  // would leave the button permanently disabled.  initData is re-read fresh
+  // at click time inside handleSubmit below.
+  const canUseTelegramAuth = hasTelegramWebApp;
   const canUseDevAuth = telegram.source === "dev";
   const canAuthenticate = canUseTelegramAuth || canUseDevAuth;
 
@@ -61,8 +65,19 @@ export function AuthEntryCard() {
       const endpoint = canUseDevAuth ? "/api/auth/dev" : "/api/auth/telegram";
       const headers: HeadersInit = {};
 
-      if (canUseTelegramAuth && telegramInitData) {
-        headers[TELEGRAM_INIT_DATA_HEADER] = telegramInitData;
+      if (canUseTelegramAuth) {
+        // Re-read initData at click time: the context value (telegram.initData)
+        // may still be null on first render, but window.Telegram.WebApp.initData
+        // is the authoritative live value populated by the Telegram SDK.
+        const freshInitData =
+          window.Telegram?.WebApp?.initData ||
+          telegram.initData ||
+          telegramInitData ||
+          null;
+
+        if (freshInitData) {
+          headers[TELEGRAM_INIT_DATA_HEADER] = freshInitData;
+        }
       }
 
       const response = await fetch(endpoint, {
