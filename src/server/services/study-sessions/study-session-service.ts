@@ -39,6 +39,11 @@ const homeParticipantSelect = {
   }
 } as const;
 
+const latestSessionOrderBy: Prisma.SessionOrderByWithRelationInput[] = [
+  { updatedAt: "desc" },
+  { scheduledFor: "desc" }
+];
+
 const homeSessionInclude = {
   chat: {
     select: {
@@ -137,7 +142,7 @@ const chatPanelInclude = {
     }
   },
   sessions: {
-    orderBy: { updatedAt: "desc" as const, scheduledFor: "desc" as const },
+    orderBy: latestSessionOrderBy,
     take: 1
   }
 } as const;
