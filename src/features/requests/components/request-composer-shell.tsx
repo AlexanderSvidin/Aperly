@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -373,6 +373,14 @@ export function RequestComposerShell({
   const [studyProgramId, setStudyProgramId] = useState(studyDefaults.programId);
   const [studyCourseYear, setStudyCourseYear] = useState(studyDefaults.courseYear);
 
+  const formCardRef = useRef<HTMLDivElement>(null);
+
+  function scrollToForm() {
+    setTimeout(() => {
+      formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   function selectScenario(scenario: RequestScenario) {
     const activeRequest = activeRequestsByScenario.get(scenario);
 
@@ -683,7 +691,7 @@ export function RequestComposerShell({
           const request = latestRequestsByScenario.get(scenario.value);
 
           return (
-            <Card key={scenario.value} eyebrow="Сценарий" title={scenario.label}>
+            <Card key={scenario.value} eyebrow="Сценарий" title={scenario.label} data-selected={selectedScenario === scenario.value ? "true" : undefined}>
               <div className="screen-stack">
                 <span
                   className="tone-pill"
@@ -708,10 +716,12 @@ export function RequestComposerShell({
                     onClick={() => {
                       if (request?.status === "ACTIVE") {
                         startEditingRequest(request);
+                        scrollToForm();
                         return;
                       }
 
                       selectScenario(scenario.value);
+                      scrollToForm();
                     }}
                     variant={request?.status === "ACTIVE" ? "secondary" : "primary"}
                   >
@@ -744,7 +754,7 @@ export function RequestComposerShell({
         })}
       </div>
 
-      <Card eyebrow="Форма" title="Данные для подбора">
+      <Card ref={formCardRef} eyebrow="Форма" title="Данные для подбора">
         <form className="profile-form" onSubmit={handleSubmit}>
           <div className="field-stack">
             <span className="field-label">Что вы ищете</span>

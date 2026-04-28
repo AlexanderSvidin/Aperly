@@ -1,9 +1,10 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type { HTMLAttributes, ReactNode, Ref } from "react";
 
 type CardProps = HTMLAttributes<HTMLDivElement> & {
   title?: string;
   eyebrow?: string;
   children: ReactNode;
+  ref?: Ref<HTMLDivElement>;
 };
 
 export function Card({ title, eyebrow, children, className, ...props }: CardProps) {

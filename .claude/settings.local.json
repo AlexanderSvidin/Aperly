@@ -25,7 +25,13 @@
       "Bash(npx prisma *)",
       "Bash(node -e \"const c=require\\('./src/features/study/lib/study-catalog.json'\\); const slugs=c.subjects.map\\(s=>s.slug\\); const extra=['statistics','programming','finance','management']; const dups=extra.filter\\(s=>slugs.includes\\(s\\)\\); console.log\\('Subject slugs in catalog:', slugs.length\\); console.log\\('Overlapping with manual additions:', dups\\);\")",
       "Bash(node --env-file=.env -e ' *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(npx tsc *)",
+      "Bash(node -e \"const data = require\\('./src/features/study/lib/study-catalog.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(data\\)\\)\\)\")",
+      "Bash(node -e \"const data = require\\('./src/features/study/lib/study-catalog.json'\\); console.log\\('englishLevels:', JSON.stringify\\(data.englishLevels\\)\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('src/features/study/lib/study-catalog.json'\\)\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
+      "Bash(python -c \"import json; d=json.load\\(open\\('src/features/study/lib/study-catalog.json', encoding='utf-8'\\)\\); print\\(list\\(d.keys\\(\\)\\)\\)\")"
     ]
   }
 }
