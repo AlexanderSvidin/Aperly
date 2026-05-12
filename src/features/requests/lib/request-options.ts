@@ -136,10 +136,10 @@ export const preferredTimeOptions = [
 ] as const;
 
 export const requestStatusLabels: Record<string, string> = {
-  ACTIVE: "Активен",
-  EXPIRED: "Истёк",
-  CLOSED: "В архиве",
-  DELETED: "Удалён"
+  ACTIVE: "Поиск идёт",
+  EXPIRED: "На паузе",
+  CLOSED: "Закрыт",
+  DELETED: "В архиве"
 };
 
 export const requestStatusTone: Record<string, "neutral" | "warning" | "success"> = {
@@ -148,6 +148,54 @@ export const requestStatusTone: Record<string, "neutral" | "warning" | "success"
   CLOSED: "neutral",
   DELETED: "neutral"
 };
+
+export type RequestLifecycleStatus =
+  | "DRAFT"
+  | "ACTIVE"
+  | "MATCHED"
+  | "PAUSED"
+  | "CLOSED"
+  | "ARCHIVED";
+
+export const requestLifecycleLabels: Record<RequestLifecycleStatus, string> = {
+  DRAFT: "Черновик",
+  ACTIVE: "Поиск идёт",
+  MATCHED: "Есть совпадения",
+  PAUSED: "На паузе",
+  CLOSED: "Закрыт",
+  ARCHIVED: "В архиве"
+};
+
+export const requestLifecycleTone: Record<
+  RequestLifecycleStatus,
+  "neutral" | "warning" | "success"
+> = {
+  DRAFT: "neutral",
+  ACTIVE: "success",
+  MATCHED: "success",
+  PAUSED: "warning",
+  CLOSED: "neutral",
+  ARCHIVED: "neutral"
+};
+
+export function getRequestLifecycleStatus(request: {
+  lastMatchedAt: string | null;
+  status: "ACTIVE" | "EXPIRED" | "CLOSED" | "DELETED";
+}): RequestLifecycleStatus {
+  if (request.status === "ACTIVE") {
+    return request.lastMatchedAt ? "MATCHED" : "ACTIVE";
+  }
+
+  if (request.status === "EXPIRED") {
+    return "PAUSED";
+  }
+
+  if (request.status === "CLOSED") {
+    return "CLOSED";
+  }
+
+  return "ARCHIVED";
+}
 
 export const requestExpiryDays = {
   CASE: 21,

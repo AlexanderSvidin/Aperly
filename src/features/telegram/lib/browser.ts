@@ -51,25 +51,12 @@ export function applyTelegramTheme(webApp: TelegramWebApp): void {
     // setHeaderColor / setBackgroundColor may be absent in older clients — ignore
   }
 
-  const root = document.documentElement;
   const themeParams = webApp.themeParams ?? {};
 
-  if (themeParams.bg_color) {
-    root.style.setProperty("--tg-bg-color", themeParams.bg_color);
-  }
-
-  if (themeParams.secondary_bg_color) {
-    root.style.setProperty(
-      "--tg-secondary-bg-color",
-      themeParams.secondary_bg_color
-    );
-  }
-
-  if (themeParams.text_color) {
-    root.style.setProperty("--tg-text-color", themeParams.text_color);
-  }
-
-  if (themeParams.hint_color) {
-    root.style.setProperty("--tg-hint-color", themeParams.hint_color);
-  }
+  // The app uses a fixed light theme with hardcoded white/beige surfaces.
+  // Overriding any colour variables from Telegram's dark theme would produce
+  // unreadable combinations (e.g. dark input backgrounds, white text on white
+  // cards).  All colours are set to WCAG-AA-compliant values in globals.css
+  // and are NOT overridden here.
+  void themeParams; // suppress unused-variable lint if tree-shaken
 }

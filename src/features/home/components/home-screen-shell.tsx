@@ -1,201 +1,49 @@
 "use client";
 
-import { FormEvent, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useRouter } from "next/navigation";
 
-import { Button, buttonClassName } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import type { SerializedHomeDashboardData } from "@/features/home/lib/home-types";
-import {
-  chatReadinessLabels,
-  scenarioLabelByValue
-} from "@/features/matching/lib/match-options";
-import { formatOptions } from "@/features/profile/lib/profile-options";
-import {
-  formatRequestDate,
-  requestStatusLabels,
-  requestStatusTone
-} from "@/features/requests/lib/request-options";
-import type { SerializedStudyContinuation } from "@/features/study-sessions/lib/study-session-types";
-
-const partnerGoalOptions = [
-  {
-    value: "case-championship",
-    label: "Кейс-чемпионат",
-    description: "Сразу откроем сценарий команды под кейс с ролями и дедлайном.",
-    href: "/requests/new?scenario=CASE",
-    actionLabel: "Перейти к кейсу",
-    tone: "blue"
-  },
-  {
-    value: "hackathon",
-    label: "Хакатон",
-    description: "Хакатон идёт через командный сценарий: роли, сроки и формат.",
-    href: "/requests/new?scenario=CASE",
-    actionLabel: "Перейти к хакатону",
-    tone: "sky"
-  },
-  {
-    value: "study",
-    label: "Совместная учеба",
-    description: "Откроем StudyBuddy с предметом, ритмом встреч и удобным временем.",
-    href: "/requests/new?scenario=STUDY",
-    actionLabel: "Перейти к учебе",
-    tone: "mint"
-  },
-  {
-    value: "startup",
-    label: "Стартап",
-    description: "Откроем проектный сценарий под идею, стадию и нужные роли.",
-    href: "/requests/new?scenario=PROJECT",
-    actionLabel: "Перейти к стартапу",
-    tone: "amber"
-  },
-  {
-    value: "pet-project",
-    label: "Пэт-проект",
-    description: "Откроем проектный сценарий для сборки команды под свой продукт.",
-    href: "/requests/new?scenario=PROJECT",
-    actionLabel: "Перейти к проекту",
-    tone: "sage"
-  }
-] as const;
-
-type PartnerGoalValue = (typeof partnerGoalOptions)[number]["value"];
+import { buttonClassName } from "@/components/ui/button";
+import type {
+  SerializedHomeFeedData,
+  SerializedHomeOpportunity
+} from "@/features/home/lib/home-types";
+import { scenarioLabelByValue } from "@/features/matching/lib/match-options";
+import { formatRequestDate } from "@/features/requests/lib/request-options";
+import type { RequestScenario } from "@/features/requests/lib/request-schema";
 
 type HomeScreenShellProps = {
-  initialData: SerializedHomeDashboardData;
+  initialData: SerializedHomeFeedData;
   showWelcomeSelector?: boolean;
   viewerName: string;
 };
 
-type FeedbackState = {
-  kind: "error" | "success";
-  message: string;
-};
+type FeedFilter = RequestScenario | "ALL";
 
-const formatLabelByValue = Object.fromEntries(
-  formatOptions.map((option) => [option.value, option.label])
-) as Record<(typeof formatOptions)[number]["value"], string>;
+const feedTabs: { value: FeedFilter; label: string }[] = [
+  { value: "ALL", label: "Все" },
+  { value: "STUDY", label: "Учёба" },
+  { value: "PROJECT", label: "Проекты" },
+  { value: "CASE", label: "Кейсы" }
+];
 
-const chatStatusLabelByValue = {
-  ACTIVE: "Активен",
-  STALE: "Ожидает ответа",
-  CLOSED: "Закрыт",
-  BLOCKED: "Ограничен"
-} as const;
-
-const studyStatusLabelByValue = {
-  PROPOSED: "Предложена",
-  CONFIRMED: "Подтверждена",
-  COMPLETED: "Проведена",
-  CANCELLED: "Отменена",
-  MISSED: "Пропущена"
-} as const;
-
-const studyStatusToneByValue = {
-  PROPOSED: "warning",
-  CONFIRMED: "success",
-  COMPLETED: "success",
-  CANCELLED: "neutral",
-  MISSED: "warning"
-} as const;
-
-const studyRecommendedActionCopy = {
-  NONE: {
-    title: "Связка уже живая",
-    description:
-      "Можно сразу договориться о следующем шаге: запланировать новую встречу, освежить поиск или остановить его."
-  },
-  SCHEDULE_NEXT: {
-    title: "Лучший следующий шаг — запланировать новую встречу",
-    description:
-      "Сессия уже дала сигнал к продолжению. Зафиксируйте следующее окно, пока у пары есть инерция."
-  },
-  FIND_NEW_PARTNER: {
-    title: "Лучший следующий шаг — найти нового напарника",
-    description:
-      "Текущая связка не сработала идеально. Можно быстро перезапустить поиск, не теряя историю чата и сессий."
-  },
-  STOP_SEARCHING: {
-    title: "Поиск можно аккуратно завершить",
-    description:
-      "Если задача уже закрыта, остановите поиск и оставьте историю пары доступной для чтения."
-  }
-} as const;
-
-function buildChatsHref(chatId?: string | null): Route {
-  const searchParams = new URLSearchParams();
-
-  if (chatId) {
-    searchParams.set("chatId", chatId);
-  }
-
-  const queryString = searchParams.toString();
-
-  return (queryString ? `/chats?${queryString}` : "/chats") as Route;
+function buildCreateHref(scenario?: RequestScenario): Route {
+  return (scenario ? `/requests/new?scenario=${scenario}` : "/requests/new") as Route;
 }
 
-function buildMatchesHref(requestId?: string | null, matchId?: string | null): Route {
-  const searchParams = new URLSearchParams();
-
-  if (requestId) {
-    searchParams.set("requestId", requestId);
-  }
-
-  if (matchId) {
-    searchParams.set("matchId", matchId);
-  }
-
-  const queryString = searchParams.toString();
-
-  return (queryString ? `/matches?${queryString}` : "/matches") as Route;
+function buildOpportunityHref(opportunity: SerializedHomeOpportunity): Route {
+  return opportunity.ctaHref as Route;
 }
 
-function formatDateTime(dateString: string) {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(dateString));
-}
+function formatAuthorMeta(opportunity: SerializedHomeOpportunity) {
+  const parts = [
+    opportunity.author.program,
+    opportunity.author.courseYear ? `${opportunity.author.courseYear} курс` : null
+  ].filter(Boolean);
 
-function toLocalDateTimeInputValue(dateString: string) {
-  const date = new Date(dateString);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const timezoneOffsetMs = date.getTimezoneOffset() * 60 * 1000;
-
-  return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
-}
-
-function buildDefaultNextSessionValue(dateString: string) {
-  const date = new Date(dateString);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  date.setDate(date.getDate() + 7);
-
-  return toLocalDateTimeInputValue(date.toISOString());
-}
-
-function buildInitialScheduleState(continuation: SerializedStudyContinuation | null) {
-  return {
-    scheduledAt: continuation
-      ? buildDefaultNextSessionValue(continuation.scheduledFor)
-      : "",
-    format: continuation?.format ?? "ONLINE",
-    notes: continuation?.notes ?? ""
-  };
+  return parts.length > 0 ? parts.join(", ") : "Профиль заполнен частично";
 }
 
 export function HomeScreenShell({
@@ -203,743 +51,120 @@ export function HomeScreenShell({
   showWelcomeSelector = false,
   viewerName
 }: HomeScreenShellProps) {
-  const router = useRouter();
-  const [selectedGoalValue, setSelectedGoalValue] = useState<PartnerGoalValue>(
-    partnerGoalOptions[0].value
-  );
-  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const [showScheduleForm, setShowScheduleForm] = useState(false);
-  const [scheduleNextState, setScheduleNextState] = useState(() =>
-    buildInitialScheduleState(initialData.studyContinuation)
+  const [activeFilter, setActiveFilter] = useState<FeedFilter>(
+    initialData.selectedScenario
   );
 
-  const selectedGoal =
-    partnerGoalOptions.find((goal) => goal.value === selectedGoalValue) ??
-    partnerGoalOptions[0];
-  const activeRequest = initialData.activeRequests[0] ?? null;
-  const readyMatchCount = initialData.latestMatches.length;
-  const candidateInitials = initialData.latestMatches
-    .slice(0, 4)
-    .map((match) => match.candidateName.trim().slice(0, 1).toUpperCase());
-  const continuationCopy = initialData.studyContinuation
-    ? studyRecommendedActionCopy[initialData.studyContinuation.recommendedAction]
-    : null;
+  const visibleOpportunities = useMemo(
+    () =>
+      activeFilter === "ALL"
+        ? initialData.opportunities
+        : initialData.opportunities.filter(
+            (opportunity) => opportunity.scenario === activeFilter
+          ),
+    [activeFilter, initialData.opportunities]
+  );
 
-  function handleRefreshMatches(requestId: string) {
-    startTransition(async () => {
-      setFeedback(null);
-
-      const response = await fetch(`/api/requests/${requestId}/matches/refresh`, {
-        method: "POST"
-      });
-
-      const result = (await response.json().catch(() => null)) as
-        | { message?: string; matchCount?: number }
-        | null;
-
-      if (!response.ok) {
-        setFeedback({
-          kind: "error",
-          message: result?.message ?? "Не удалось обновить подбор для этого запроса."
-        });
-        return;
-      }
-
-      setFeedback({
-        kind: "success",
-        message:
-          typeof result?.matchCount === "number"
-            ? `Подбор обновлен: найдено ${result.matchCount} релевантных вариантов.`
-            : "Подбор успешно обновлен."
-      });
-      router.refresh();
-    });
-  }
-
-  function handleOpenMatchChat(matchId: string) {
-    startTransition(async () => {
-      setFeedback(null);
-
-      const response = await fetch(`/api/matches/${matchId}/open-chat`, {
-        method: "POST"
-      });
-
-      const result = (await response.json().catch(() => null)) as
-        | {
-            status?: "CHAT_READY" | "INVITE_SENT";
-            chatId?: string;
-            message?: string;
-          }
-        | null;
-
-      if (!response.ok || !result?.status) {
-        setFeedback({
-          kind: "error",
-          message: result?.message ?? "Не удалось продолжить работу по этому мэтчу."
-        });
-        return;
-      }
-
-      if (result.status === "CHAT_READY" && result.chatId) {
-        router.push(buildChatsHref(result.chatId));
-        router.refresh();
-        return;
-      }
-
-      setFeedback({
-        kind: "success",
-        message:
-          "Приглашение отправлено. Чат откроется, когда вторая сторона его примет."
-      });
-      router.refresh();
-    });
-  }
-
-  function handleToggleScheduleForm() {
-    setShowScheduleForm((current) => !current);
-    setScheduleNextState((current) =>
-      current.scheduledAt
-        ? current
-        : buildInitialScheduleState(initialData.studyContinuation)
-    );
-  }
-
-  function handleScheduleNextSession(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const continuation = initialData.studyContinuation;
-
-    if (!continuation) {
-      return;
-    }
-
-    if (!scheduleNextState.scheduledAt) {
-      setFeedback({
-        kind: "error",
-        message: "Укажите дату и время следующей встречи."
-      });
-      return;
-    }
-
-    startTransition(async () => {
-      setFeedback(null);
-
-      const response = await fetch(
-        `/api/sessions/${continuation.sessionId}/schedule-next`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            scheduledAt: new Date(scheduleNextState.scheduledAt).toISOString(),
-            format: scheduleNextState.format,
-            notes: scheduleNextState.notes.trim() || undefined
-          })
-        }
-      );
-
-      const result = (await response.json().catch(() => null)) as
-        | { message?: string }
-        | null;
-
-      if (!response.ok) {
-        setFeedback({
-          kind: "error",
-          message:
-            result?.message ?? "Не удалось запланировать следующую StudyBuddy-встречу."
-        });
-        return;
-      }
-
-      setShowScheduleForm(false);
-      setFeedback({
-        kind: "success",
-        message: "Следующая StudyBuddy-встреча запланирована."
-      });
-      router.refresh();
-    });
-  }
-
-  function handleFindNewPartner() {
-    if (!initialData.studyContinuation?.requestId) {
-      setFeedback({
-        kind: "error",
-        message:
-          "Для перезапуска поиска нужен активный StudyBuddy-запрос на вашей стороне."
-      });
-      return;
-    }
-
-    startTransition(async () => {
-      setFeedback(null);
-
-      const response = await fetch(
-        `/api/requests/${initialData.studyContinuation?.requestId}/find-new-partner`,
-        {
-          method: "POST"
-        }
-      );
-
-      const result = (await response.json().catch(() => null)) as
-        | { message?: string }
-        | null;
-
-      if (!response.ok) {
-        setFeedback({
-          kind: "error",
-          message: result?.message ?? "Не удалось запустить поиск нового напарника."
-        });
-        return;
-      }
-
-      setFeedback({
-        kind: "success",
-        message: "Поиск нового StudyBuddy запущен заново."
-      });
-      router.refresh();
-    });
-  }
-
-  function handleStopSearching() {
-    if (!initialData.studyContinuation?.requestId) {
-      setFeedback({
-        kind: "error",
-        message:
-          "Остановить поиск можно только для активного StudyBuddy-запроса."
-      });
-      return;
-    }
-
-    startTransition(async () => {
-      setFeedback(null);
-
-      const response = await fetch(
-        `/api/requests/${initialData.studyContinuation?.requestId}/stop-searching`,
-        {
-          method: "POST"
-        }
-      );
-
-      const result = (await response.json().catch(() => null)) as
-        | { message?: string }
-        | null;
-
-      if (!response.ok) {
-        setFeedback({
-          kind: "error",
-          message: result?.message ?? "Не удалось остановить поиск."
-        });
-        return;
-      }
-
-      setFeedback({
-        kind: "success",
-        message: "Поиск по StudyBuddy остановлен."
-      });
-      router.refresh();
-    });
-  }
+  const preferredScenario =
+    activeFilter === "ALL" ? undefined : activeFilter;
 
   return (
     <section className="screen-stack">
-      <section className="home-hero">
+      <section className="surface-card screen-stack">
         <div className="screen-copy">
-          <h1 className="hero-title">Привет, {viewerName}</h1>
-          <p className="hero-description">
-            {activeRequest
-              ? `Команда почти собрана — осталось закрыть роли по «${activeRequest.title}».`
-              : "Создайте запрос под кейс, проект или совместную учёбу — Aperly подберёт людей по цели, ролям и времени."}
+          <p className="card-eyebrow">Главная</p>
+          <h1 className="screen-title">Открытые возможности</h1>
+          <p className="screen-description">
+            {showWelcomeSelector
+              ? `Привет, ${viewerName}. Посмотрите, кто уже ищет команду, проектного партнёра или StudyBuddy.`
+              : "Здесь видны активные запросы других студентов. Чтобы откликнуться, создайте свой запрос в похожем сценарии."}
           </p>
         </div>
-        <Link
-          className="home-cta-banner"
-          href={
-            initialData.latestMatches[0]
-              ? buildMatchesHref(
-                  initialData.latestMatches[0].requestId,
-                  initialData.latestMatches[0].id
-                )
-              : initialData.primaryCta.href
-          }
-        >
-          <span className="home-cta-icon" aria-hidden="true">
-            ◦
-          </span>
-          <span>
-            <strong>
-              {initialData.latestMatches.length > 0
-                ? "Написать подходящим кандидатам"
-                : "Создать первый запрос"}
-            </strong>
-            <small>
-              {initialData.latestMatches.length > 0
-                ? "Обычно отвечают в течение 5 минут"
-                : "CASE, PROJECT и STUDY доступны в одной форме"}
-            </small>
-          </span>
-        </Link>
+
+        <div className="home-feed-tabs" role="tablist" aria-label="Фильтр возможностей">
+          {feedTabs.map((tab) => (
+            <button
+              key={tab.value}
+              aria-selected={activeFilter === tab.value}
+              className="toggle-chip"
+              data-selected={activeFilter === tab.value}
+              onClick={() => setActiveFilter(tab.value)}
+              role="tab"
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </section>
 
-      {feedback ? (
-        <div
-          className={
-            feedback.kind === "error"
-              ? "feedback-box error-box"
-              : "feedback-box success-box"
-          }
-        >
-          <p className="feedback-title">{feedback.message}</p>
-        </div>
-      ) : null}
-
-      {showWelcomeSelector ? (
-        <Card eyebrow="После регистрации" title="Выберите цель поиска">
-          <div className="screen-stack">
-            <label className="field-stack">
-              <span className="field-label">Для чего нужен напарник</span>
-              <select
-                className="field-input field-select"
-                onChange={(event) =>
-                  setSelectedGoalValue(event.target.value as PartnerGoalValue)
-                }
-                value={selectedGoalValue}
-              >
-                {partnerGoalOptions.map((goal) => (
-                  <option key={goal.value} value={goal.value}>
-                    {goal.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="quick-goal-preview" data-tone={selectedGoal.tone}>
-              <span
-                className="accent-icon-badge"
-                data-tone={selectedGoal.tone}
-                aria-hidden="true"
-              >
-                {selectedGoal.label.slice(0, 2)}
-              </span>
-              <div className="special-card-copy">
-                <strong>{selectedGoal.label}</strong>
-                <p className="helper-text">{selectedGoal.description}</p>
-              </div>
-            </div>
-
-            <Link
-              className={buttonClassName({ fullWidth: true })}
-              href={selectedGoal.href}
-            >
-              {selectedGoal.actionLabel}
-            </Link>
+      {visibleOpportunities.length === 0 ? (
+        <section className="surface-card screen-stack">
+          <div className="screen-copy">
+            <p className="card-eyebrow">Пока тихо</p>
+            <h2 className="card-title">Нет открытых запросов</h2>
+            <p className="card-body-copy">
+              Пока нет открытых запросов. Создайте свой — и другие смогут
+              откликнуться.
+            </p>
           </div>
-        </Card>
-      ) : null}
-
-      <Card eyebrow="Твой активный запрос" title={activeRequest?.title ?? "Запрос под цель"}>
-        {activeRequest ? (
-          <div className="active-request-card">
-            <div className="active-request-icon" aria-hidden="true">
-              {activeRequest.scenario === "CASE"
-                ? "C"
-                : activeRequest.scenario === "PROJECT"
-                  ? "P"
-                  : "S"}
-            </div>
-            <div className="active-request-copy">
-              <span className="status-pill">
-                {scenarioLabelByValue[activeRequest.scenario]}
-              </span>
-              <p className="card-body-copy">{activeRequest.subtitle}</p>
-              <p className="helper-text">
-                Дедлайн поиска: {formatRequestDate(activeRequest.expiresAt)}
-              </p>
-            </div>
-            <div className="request-avatar-stack" aria-label="Кандидаты">
-              {candidateInitials.length > 0 ? (
-                candidateInitials.map((initial, index) => (
-                  <span key={`${initial}-${index}`} className="mini-avatar">
-                    {initial}
+          <Link
+            className={buttonClassName({ fullWidth: true })}
+            href={buildCreateHref(preferredScenario)}
+          >
+            Создать запрос
+          </Link>
+        </section>
+      ) : (
+        <div className="opportunity-list">
+          {visibleOpportunities.map((opportunity) => (
+            <article key={opportunity.id} className="opportunity-card">
+              <div className="opportunity-card-main">
+                <div className="match-badge-row">
+                  <span className="status-pill">
+                    {scenarioLabelByValue[opportunity.scenario]}
                   </span>
-                ))
-              ) : (
-                <span className="mini-avatar muted">+</span>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="screen-stack">
-            <p className="card-body-copy">
-              Начните с короткого запроса: укажите событие, проект или учебный
-              предмет, роли и удобное время.
-            </p>
-            <Link
-              className={buttonClassName({ fullWidth: true })}
-              href={initialData.primaryCta.href}
-            >
-              {initialData.primaryCta.label}
-            </Link>
-          </div>
-        )}
-      </Card>
-
-      {initialData.upcomingStudySession ? (
-        <Card eyebrow="StudyBuddy" title="Ближайшая встреча">
-          <div className="screen-stack">
-            <div className="dashboard-row-copy">
-              <div className="dashboard-row-head">
-                <strong>{initialData.upcomingStudySession.subjectName}</strong>
-                <span
-                  className="tone-pill"
-                  data-tone={
-                    studyStatusToneByValue[initialData.upcomingStudySession.status]
-                  }
-                >
-                  {
-                    studyStatusLabelByValue[
-                      initialData.upcomingStudySession.status
-                    ]
-                  }
-                </span>
-              </div>
-              <p className="helper-text">
-                С напарником {initialData.upcomingStudySession.partnerName}
-              </p>
-              <p className="card-body-copy">
-                {formatDateTime(initialData.upcomingStudySession.scheduledFor)} •{" "}
-                {
-                  formatLabelByValue[initialData.upcomingStudySession.format]
-                }
-              </p>
-              {initialData.upcomingStudySession.notes ? (
-                <p className="helper-text">
-                  Заметка: {initialData.upcomingStudySession.notes}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="card-actions-row card-actions-row-inline">
-              <Link
-                className={buttonClassName({ variant: "secondary" })}
-                href={buildChatsHref(initialData.upcomingStudySession.chatId)}
-              >
-                Открыть чат
-              </Link>
-              <button
-                className={buttonClassName({ variant: "ghost" })}
-                onClick={handleToggleScheduleForm}
-                type="button"
-              >
-                Запланировать следующую
-              </button>
-            </div>
-          </div>
-        </Card>
-      ) : null}
-
-      {initialData.studyContinuation && continuationCopy ? (
-        <Card eyebrow="StudyBuddy" title="Что дальше по совместной учёбе">
-          <div className="screen-stack">
-            <div className="dashboard-row-copy">
-              <div className="dashboard-row-head">
-                <strong>{continuationCopy.title}</strong>
-                <span className="status-pill">
-                  Сессия #{initialData.studyContinuation.sequenceNumber}
-                </span>
-              </div>
-              <p className="helper-text">
-                {initialData.studyContinuation.subjectName} •{" "}
-                {initialData.studyContinuation.partnerName}
-              </p>
-              <p className="card-body-copy">{continuationCopy.description}</p>
-            </div>
-
-            <div className="dashboard-action-grid">
-              <Button disabled={isPending} onClick={handleToggleScheduleForm}>
-                Запланировать следующую встречу
-              </Button>
-              <Button
-                disabled={
-                  isPending || !initialData.studyContinuation.canFindNewPartner
-                }
-                onClick={handleFindNewPartner}
-                variant="secondary"
-              >
-                Найти нового партнера
-              </Button>
-              <Button
-                disabled={isPending || !initialData.studyContinuation.canStopSearching}
-                onClick={handleStopSearching}
-                variant="ghost"
-              >
-                Остановить поиск
-              </Button>
-            </div>
-
-            {showScheduleForm ? (
-              <form className="screen-stack" onSubmit={handleScheduleNextSession}>
-                <div className="form-grid">
-                  <label className="field-stack">
-                    <span className="field-label">Дата и время</span>
-                    <input
-                      className="field-input"
-                      onChange={(event) =>
-                        setScheduleNextState((current) => ({
-                          ...current,
-                          scheduledAt: event.target.value
-                        }))
-                      }
-                      type="datetime-local"
-                      value={scheduleNextState.scheduledAt}
-                    />
-                  </label>
-
-                  <label className="field-stack">
-                    <span className="field-label">Формат</span>
-                    <select
-                      className="field-input field-select"
-                      onChange={(event) =>
-                        setScheduleNextState((current) => ({
-                          ...current,
-                          format: event.target.value as
-                            | "ONLINE"
-                            | "OFFLINE"
-                            | "HYBRID"
-                        }))
-                      }
-                      value={scheduleNextState.format}
-                    >
-                      {formatOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <span className="tone-pill" data-tone="success">
+                    {opportunity.trustInfo}
+                  </span>
                 </div>
 
-                <label className="field-stack">
-                  <span className="field-label">Комментарий</span>
-                  <textarea
-                    className="field-input field-textarea"
-                    onChange={(event) =>
-                      setScheduleNextState((current) => ({
-                        ...current,
-                        notes: event.target.value
-                      }))
-                    }
-                    placeholder="Например: повторить темы перед семинаром"
-                    rows={3}
-                    value={scheduleNextState.notes}
-                  />
-                </label>
-
-                <div className="card-actions-row card-actions-row-inline">
-                  <Button disabled={isPending} type="submit">
-                    {isPending ? "Сохраняем..." : "Сохранить следующую встречу"}
-                  </Button>
-                  <Button
-                    disabled={isPending}
-                    onClick={handleToggleScheduleForm}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Свернуть
-                  </Button>
-                </div>
-              </form>
-            ) : null}
-          </div>
-        </Card>
-      ) : null}
-
-      <Card eyebrow="Ваши сценарии" title="Активные запросы">
-        {initialData.activeRequests.length === 0 ? (
-          <div className="screen-stack">
-            <p className="card-body-copy">
-              Начните с одного короткого сценария, и Home превратится в рабочий
-              экран с матчами и чатами.
-            </p>
-            <Link
-              className={buttonClassName({ fullWidth: true })}
-              href={initialData.primaryCta.href}
-            >
-              {initialData.primaryCta.label}
-            </Link>
-          </div>
-        ) : (
-          <div className="dashboard-list">
-            {initialData.activeRequests.map((request) => (
-              <div key={request.id} className="dashboard-row">
-                <div className="dashboard-row-copy">
-                  <div className="dashboard-row-head">
-                    <strong>{request.title}</strong>
-                    <span
-                      className="tone-pill"
-                      data-tone={requestStatusTone[request.status]}
-                    >
-                      {requestStatusLabels[request.status]}
-                    </span>
-                  </div>
-                  <p className="helper-text">
-                    {scenarioLabelByValue[request.scenario]} • {request.subtitle}
-                  </p>
-                  <p className="card-body-copy">
-                    До {formatRequestDate(request.expiresAt)}
-                    {request.lastMatchedAt
-                      ? ` • обновлялся ${formatRequestDate(request.lastMatchedAt)}`
-                      : " • подбор еще не запускался"}
-                  </p>
+                <div className="screen-copy">
+                  <h2 className="card-title">{opportunity.title}</h2>
+                  <p className="card-body-copy">{opportunity.goal}</p>
                 </div>
 
-                <div className="request-card-actions">
-                  <Link
-                    className={buttonClassName({ variant: "secondary" })}
-                    href={buildMatchesHref(request.id)}
-                  >
-                    Открыть подбор
-                  </Link>
-                  <button
-                    className={buttonClassName({ variant: "ghost" })}
-                    disabled={isPending}
-                    onClick={() => handleRefreshMatches(request.id)}
-                    type="button"
-                  >
-                    Обновить мэтчи ({request.activeMatchCount})
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <Card
-        eyebrow="Подбор"
-        title={
-          readyMatchCount > 0
-            ? `${readyMatchCount} человека готовы сейчас`
-            : "Подбор готов к запуску"
-        }
-      >
-        {initialData.latestMatches.length === 0 ? (
-          <div className="screen-stack">
-            <p className="card-body-copy">
-              Уточните цель, роли, формат и доступное время — так первые
-              кандидаты появятся быстрее.
-            </p>
-            <Link
-              className={buttonClassName({ fullWidth: true, variant: "secondary" })}
-              href="/requests/new"
-            >
-              Улучшить запрос
-            </Link>
-          </div>
-        ) : (
-          <div className="dashboard-list">
-            {initialData.latestMatches.map((match) => (
-              <div key={match.id} className="dashboard-row">
-                <div className="dashboard-row-copy">
-                  <div className="dashboard-row-head">
-                    <strong>{match.candidateName}</strong>
-                    <span className="score-pill">{match.score}/100</span>
-                  </div>
-                  <p className="helper-text">
-                    {scenarioLabelByValue[match.requestScenario]} • {match.requestTitle}
-                  </p>
-                  <p className="card-body-copy">{match.reasonSummary}</p>
-                  <p className="helper-text">
-                    {chatReadinessLabels[match.chatReadiness]} •{" "}
-                    {formatDateTime(match.computedAt)}
-                  </p>
-                </div>
-
-                <div className="request-card-actions">
-                  <button
-                    className={buttonClassName({ variant: "secondary" })}
-                    disabled={isPending}
-                    onClick={() => handleOpenMatchChat(match.id)}
-                    type="button"
-                  >
-                    {match.chatReadiness === "READY_FOR_CHAT"
-                      ? "Перейти в чат"
-                      : "Отправить приглашение"}
-                  </button>
-                  <Link
-                    className={buttonClassName({ variant: "ghost" })}
-                    href={buildMatchesHref(match.requestId, match.id)}
-                  >
-                    Открыть в мэтчах
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <Card eyebrow="Чаты" title="Диалоги и следующий шаг">
-        {initialData.activeChats.length === 0 ? (
-          <div className="chat-action-strip">
-            <div>
-              <strong>Начните с 1–2 кандидатов</strong>
-              <p className="helper-text">
-                Обсудите цель, роли и время, затем открывайте контакты только
-                по взаимному согласию.
-              </p>
-            </div>
-            <Link
-              className={buttonClassName({ variant: "secondary" })}
-              href="/matches"
-            >
-              Открыть мэтчи
-            </Link>
-          </div>
-        ) : (
-          <div className="dashboard-list">
-            {initialData.activeChats.map((chat) => (
-              <div key={chat.id} className="dashboard-row">
-                <div className="dashboard-row-copy">
-                  <div className="dashboard-row-head">
-                    <strong>{chat.otherUser.displayName}</strong>
-                    <span
-                      className="tone-pill"
-                      data-tone={chat.status === "STALE" ? "warning" : "success"}
-                    >
-                      {chatStatusLabelByValue[chat.status]}
-                    </span>
-                  </div>
-                  <p className="helper-text">
-                    {scenarioLabelByValue[chat.scenario]} •{" "}
-                    {chat.lastMessageAt
-                      ? `последнее сообщение ${formatDateTime(chat.lastMessageAt)}`
-                      : "диалог только открылся"}
-                  </p>
-                  <p className="card-body-copy">
-                    {chat.lastMessagePreview ?? "Чат готов к первому сообщению."}
-                  </p>
-                </div>
-
-                <div className="request-card-actions">
-                  <Link
-                    className={buttonClassName({ variant: "secondary" })}
-                    href={buildChatsHref(chat.id)}
-                  >
-                    Открыть чат
-                  </Link>
-                  {chat.canSendReminder ? (
-                    <span className="status-pill" data-source="dev">
-                      Ожидает ответа
-                    </span>
+                <div className="chip-row">
+                  <span className="info-chip">{opportunity.meta}</span>
+                  {opportunity.format ? (
+                    <span className="info-chip">{opportunity.format}</span>
+                  ) : null}
+                  {opportunity.time ? (
+                    <span className="info-chip">{opportunity.time}</span>
                   ) : null}
                 </div>
+
+                <div className="opportunity-author">
+                  <strong>{opportunity.author.name}</strong>
+                  <span>{formatAuthorMeta(opportunity)}</span>
+                </div>
+
+                <p className="helper-text">{opportunity.relevanceReason}</p>
+                <p className="helper-text">
+                  Активно до {formatRequestDate(opportunity.expiresAt)}
+                </p>
               </div>
-            ))}
-          </div>
-        )}
-      </Card>
+
+              <Link
+                className={buttonClassName({ fullWidth: true })}
+                href={buildOpportunityHref(opportunity)}
+              >
+                {opportunity.ctaLabel}
+              </Link>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

@@ -9,6 +9,8 @@ export async function GET(request: Request) {
   return NextResponse.json({
     source: context.source,
     hasInitData: Boolean(context.initData),
-    devFallbackEnabled: telegramServerEnv.ALLOW_DEV_TELEGRAM_FALLBACK
+    devFallbackEnabled:
+      process.env.NODE_ENV !== "production" &&
+      telegramServerEnv.ALLOW_DEV_TELEGRAM_FALLBACK
   });
 }

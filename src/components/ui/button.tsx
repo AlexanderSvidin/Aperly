@@ -24,10 +24,18 @@ export function buttonClassName({
   return `button button-primary ${widthClass}`.trim();
 }
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & ButtonClassOptions;
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
+  ButtonClassOptions & {
+    isLoading?: boolean;
+    loadingLabel?: string;
+  };
 
 export function Button({
+  children,
   className,
+  disabled,
+  isLoading = false,
+  loadingLabel,
   variant,
   fullWidth,
   type = "button",
@@ -40,5 +48,22 @@ export function Button({
     .join(" ")
     .trim();
 
-  return <button className={composedClassName} type={type} {...props} />;
+  return (
+    <button
+      aria-busy={isLoading || undefined}
+      className={composedClassName}
+      disabled={disabled || isLoading}
+      type={type}
+      {...props}
+    >
+      {isLoading ? (
+        <>
+          <span aria-hidden="true" className="button-spinner" />
+          <span>{loadingLabel ?? children}</span>
+        </>
+      ) : (
+        children
+      )}
+    </button>
+  );
 }

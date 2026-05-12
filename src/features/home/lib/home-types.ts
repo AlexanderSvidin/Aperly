@@ -39,6 +39,34 @@ export type SerializedHomePrimaryCta = {
   action: "create_request";
 };
 
+export type SerializedHomeOpportunity = {
+  id: string;
+  scenario: RequestScenario;
+  title: string;
+  goal: string;
+  meta: string;
+  format: string | null;
+  time: string | null;
+  author: {
+    name: string;
+    program: string | null;
+    courseYear: number | null;
+  };
+  trustInfo: string;
+  relevanceReason: string;
+  ctaLabel: "Откликнуться" | "Открыть отклики";
+  ctaHref: string;
+  expiresAt: string;
+  updatedAt: string;
+};
+
+export type SerializedHomeFeedData = {
+  opportunities: SerializedHomeOpportunity[];
+  activeScenarioFilters: RequestScenario[];
+  selectedScenario: RequestScenario | "ALL";
+  primaryCta: SerializedHomePrimaryCta;
+};
+
 export type SerializedHomeDashboardData = {
   activeRequests: SerializedHomeRequestItem[];
   latestMatches: SerializedHomeMatchItem[];

@@ -1,8 +1,10 @@
 :root {
   --tg-bg-color: #f7f4ed;
   --tg-secondary-bg-color: #ffffff;
-  --tg-text-color: #080b2a;
-  --tg-hint-color: #737891;
+  /* #1a1a2e: contrast 14.7:1 on white, 12.1:1 on beige — WCAG AAA */
+  --tg-text-color: #1a1a2e;
+  /* #4a4a6a: contrast 8.5:1 on white, 7.7:1 on beige — WCAG AAA */
+  --tg-hint-color: #4a4a6a;
   --surface-border: rgba(22, 27, 58, 0.08);
   --surface-shadow: rgba(25, 28, 55, 0.1);
   --accent: #6c4cf1;
@@ -53,7 +55,23 @@ select {
   margin: 0 auto;
   max-width: var(--max-content-width);
   min-height: 100vh;
-  padding: 18px 18px calc(136px + env(safe-area-inset-bottom, 0px));
+  /* safe-area-inset-top: accounts for the Telegram native header / phone notch
+     so the hero panel doesn't sit directly against the top edge. */
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 18px
+    calc(136px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Auth card loading skeleton */
+.auth-card-loading-hint {
+  opacity: 0.55;
+}
+
+.auth-card-loading-btn {
+  /* Matches the real button height so the card doesn't jump when resolved */
+  min-height: 54px;
+  opacity: 0.25;
+  pointer-events: none;
+  border-radius: 999px;
 }
 
 .shell-content {
@@ -193,24 +211,39 @@ select {
 .field-textarea {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--surface-border);
+  /* Fixed light colours — never inherit from Telegram dark theme variables */
+  border: 1px solid #d8d4cc;
   border-radius: var(--radius-small);
-  background: var(--tg-secondary-bg-color);
-  color: var(--tg-text-color);
+  background: #f0eee8;
+  color: #1a1a2e;
   padding: 14px 16px;
+}
+
+.field-input:focus,
+.field-textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: transparent;
 }
 
 .field-select {
   appearance: none;
   padding-right: 44px;
+  /* Arrow chevron uses fixed dark colour — independent of --tg-hint-color */
   background-image:
-    linear-gradient(45deg, transparent 50%, var(--tg-hint-color) 50%),
-    linear-gradient(135deg, var(--tg-hint-color) 50%, transparent 50%);
+    linear-gradient(45deg, transparent 50%, #4a4a6a 50%),
+    linear-gradient(135deg, #4a4a6a 50%, transparent 50%);
   background-position:
     calc(100% - 22px) calc(50% - 3px),
     calc(100% - 16px) calc(50% - 3px);
   background-size: 6px 6px;
   background-repeat: no-repeat;
+}
+
+/* Ensure native <option> elements are always readable */
+.field-select option {
+  background: #f0eee8;
+  color: #1a1a2e;
 }
 
 .field-time-input {
@@ -750,7 +783,8 @@ select {
 
 .score-pill {
   background: rgba(31, 111, 176, 0.14);
-  color: var(--accent-strong);
+  /* --accent-strong (#4a6cf7) gives only 4.4:1 on white — use --accent (#6c4cf1) for 5.3:1 */
+  color: var(--accent);
 }
 
 .info-chip {
@@ -795,6 +829,7 @@ select {
   min-height: 54px;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   border-radius: 999px;
   border: 1px solid transparent;
   font-weight: 800;
@@ -815,6 +850,22 @@ select {
   cursor: not-allowed;
   opacity: 0.58;
   transform: none;
+}
+
+.button-spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: button-spin 700ms linear infinite;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .button-full {
@@ -872,7 +923,7 @@ select {
   bottom: 0;
   left: 0;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 4px;
   max-width: var(--max-content-width);
   margin: 0 auto;
@@ -938,6 +989,47 @@ select {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.home-feed-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opportunity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.opportunity-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: 1px solid rgba(216, 210, 194, 0.84);
+  border-radius: var(--radius-small);
+  background: rgba(255, 255, 255, 0.58);
+  padding: 16px;
+}
+
+.opportunity-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opportunity-author {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-top: 1px solid rgba(216, 210, 194, 0.7);
+  padding-top: 12px;
+}
+
+.opportunity-author span {
+  color: var(--tg-hint-color);
+  font-size: 0.9rem;
 }
 
 .bullet-list {
@@ -1092,6 +1184,9 @@ select {
   flex-direction: column;
   gap: 22px;
   padding: 18px 4px 4px;
+  /* Pin heading colour: beige background, cannot rely on --tg-text-color
+     which Telegram dark themes may override to white */
+  color: #1a1a2e;
 }
 
 .home-cta-banner {

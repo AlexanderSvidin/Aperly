@@ -4,6 +4,7 @@ import { matchingService } from "@/server/services/matching/matching-service";
 
 type MatchesPageProps = {
   searchParams: Promise<{
+    created?: string | string[];
     requestId?: string | string[];
     matchId?: string | string[];
   }>;
@@ -21,5 +22,11 @@ export default async function MatchesPage({ searchParams }: MatchesPageProps) {
     matchId: readSingleSearchParam(resolvedSearchParams.matchId)
   });
 
-  return <MatchesScreenShell initialData={initialData} />;
+  return (
+    <MatchesScreenShell
+      creationNotice={readSingleSearchParam(resolvedSearchParams.created) === "1"}
+      initialData={initialData}
+      key={user.id}
+    />
+  );
 }

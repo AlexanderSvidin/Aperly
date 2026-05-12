@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState } from "react";
+
+import type { Route } from "next";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,14 +12,15 @@ import {
   collaborationRoleOptions,
   commitmentOptions,
   formatRequestDate,
+  getRequestLifecycleStatus,
   minuteRangeToLabel,
   preferredTimeOptions,
   projectStageOptions,
+  requestLifecycleLabels,
+  requestLifecycleTone,
   requestDayOfWeekOptions,
   requestFormatOptions,
   requestScenarioOptions,
-  requestStatusLabels,
-  requestStatusTone,
   studyFrequencyOptions,
   timeLabelToMinute,
   toDateInputValue
@@ -27,6 +31,8 @@ import type {
 } from "@/features/requests/lib/request-schema";
 import { StudySubjectPicker } from "@/features/study/components/study-subject-picker";
 import { type StudyLevelId } from "@/features/study/lib/study-catalog";
+import type { ActionState } from "@/lib/ui/action-state";
+import { idleActionState, isActionLoading } from "@/lib/ui/action-state";
 
 type SubjectOption = {
   id: string;
@@ -308,8 +314,21 @@ function describeRequest(request: SerializedRequest) {
   ).toLowerCase()}`;
 }
 
+function getRequestStatusBadge(request: SerializedRequest) {
+  const lifecycleStatus = getRequestLifecycleStatus(request);
+
+  return {
+    label: requestLifecycleLabels[lifecycleStatus],
+    tone: requestLifecycleTone[lifecycleStatus]
+  };
+}
+
 function upsertRequestInList(requests: SerializedRequest[], nextRequest: SerializedRequest) {
   const filtered = requests.filter((request) => request.id !== nextRequest.id);
+
+  if (nextRequest.status === "DELETED") {
+    return filtered;
+  }
 
   return [nextRequest, ...filtered].sort(
     (left, right) =>
@@ -323,9 +342,12 @@ export function RequestComposerShell({
   studyDefaults,
   initialScenario
 }: RequestComposerShellProps) {
+  const router = useRouter();
   const [requests, setRequests] = useState(initialRequests);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [actionStates, setActionStates] = useState<Record<string, ActionState>>(
+    {}
+  );
 
   const activeRequestsByScenario = useMemo(() => {
     const activeEntries = new Map<RequestScenario, SerializedRequest>();
@@ -374,6 +396,29 @@ export function RequestComposerShell({
   const [studyCourseYear, setStudyCourseYear] = useState(studyDefaults.courseYear);
 
   const formCardRef = useRef<HTMLDivElement>(null);
+
+  function getActionState(actionKey: string) {
+    return actionStates[actionKey] ?? idleActionState;
+  }
+
+  function setActionStatus(actionKey: string, state: ActionState) {
+    setActionStates((currentStates) => ({
+      ...currentStates,
+      [actionKey]: state
+    }));
+  }
+
+  function isActionBusy(actionKey: string) {
+    return isActionLoading(getActionState(actionKey));
+  }
+
+  function hasBusyAction() {
+    return Object.values(actionStates).some(isActionLoading);
+  }
+
+  function buildRequestActionKey(action: string, requestId: string) {
+    return `${action}:${requestId}`;
+  }
 
   function scrollToForm() {
     setTimeout(() => {
@@ -470,6 +515,7 @@ export function RequestComposerShell({
     body?: object
   ) {
     const response = await fetch(endpoint, {
+      cache: "no-store",
       method,
       headers: body
         ? {
@@ -484,6 +530,8 @@ export function RequestComposerShell({
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const actionKey = "save";
+    const isEditingExistingRequest = Boolean(editingRequestId);
 
     if (!draft) {
       setFeedback({
@@ -493,8 +541,16 @@ export function RequestComposerShell({
       return;
     }
 
-    startTransition(async () => {
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
+    void (async () => {
       setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message: editingRequestId ? "Сохраняем изменения..." : "Создаём запрос..."
+      });
 
       const payload =
         draft.scenario === "CASE"
@@ -571,9 +627,14 @@ export function RequestComposerShell({
           }
         }
 
+        const message = result?.message ?? "Не удалось сохранить запрос.";
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
         setFeedback({
           kind: "error",
-          message: result?.message ?? "Не удалось сохранить запрос.",
+          message,
           issues: extractIssueMessages(result)
         });
         return;
@@ -585,19 +646,45 @@ export function RequestComposerShell({
       setEditingRequestId(result.request.id);
       setDraft(createDraftFromRequest(result.request));
       setSelectedScenario(result.request.scenario);
+      const message =
+        result.request.status === "ACTIVE"
+          ? "Запрос опубликован. Теперь люди смогут откликнуться."
+          : "Запрос сохранён.";
+      setActionStatus(actionKey, {
+        status: "success",
+        message
+      });
       setFeedback({
         kind: "success",
-        message:
-          result.request.status === "ACTIVE"
-            ? "Запрос сохранён. Новые матчи появятся после обновления."
-            : "Запрос сохранён."
+        message
       });
-    });
+
+      if (!isEditingExistingRequest) {
+        router.push(
+          `/matches?requestId=${result.request.id}&created=1` as Route
+        );
+        router.refresh();
+      }
+    })();
   }
 
   function handleArchive(requestId: string) {
-    startTransition(async () => {
+    if (!window.confirm("Архивировать запрос? Он исчезнет из списка.")) {
+      return;
+    }
+
+    const actionKey = buildRequestActionKey("archive", requestId);
+
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
+    void (async () => {
       setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message: "Архивируем запрос..."
+      });
 
       const response = await mutateRequestList(
         `/api/requests/${requestId}/archive`,
@@ -611,9 +698,14 @@ export function RequestComposerShell({
         | null;
 
       if (!response.ok || !result?.request) {
+        const message = result?.message ?? "Не удалось архивировать запрос.";
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
         setFeedback({
           kind: "error",
-          message: result?.message ?? "Не удалось архивировать запрос."
+          message
         });
         return;
       }
@@ -627,16 +719,150 @@ export function RequestComposerShell({
         setDraft(createDefaultDraft(selectedScenario, subjects));
       }
 
+      setActionStatus(actionKey, {
+        status: "success",
+        message: "Запрос перемещён в архив."
+      });
       setFeedback({
         kind: "success",
-        message: "Запрос архивирован."
+        message: "Запрос перемещён в архив."
       });
-    });
+    })();
+  }
+
+  function handlePause(requestId: string) {
+    const actionKey = buildRequestActionKey("pause", requestId);
+
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
+    void (async () => {
+      setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message: "Ставим запрос на паузу..."
+      });
+
+      const response = await mutateRequestList(
+        `/api/requests/${requestId}/pause`,
+        "POST"
+      );
+      const result = (await response.json().catch(() => null)) as
+        | {
+            request?: SerializedRequest;
+            message?: string;
+          }
+        | null;
+
+      if (!response.ok || !result?.request) {
+        const message = result?.message ?? "Не удалось поставить запрос на паузу.";
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
+        setFeedback({
+          kind: "error",
+          message
+        });
+        return;
+      }
+
+      setRequests((currentRequests) =>
+        upsertRequestInList(currentRequests, result.request!)
+      );
+
+      if (editingRequestId === requestId && selectedScenario) {
+        setEditingRequestId(null);
+        setDraft(createDefaultDraft(selectedScenario, subjects));
+      }
+
+      setActionStatus(actionKey, {
+        status: "success",
+        message: "Запрос на паузе."
+      });
+      setFeedback({
+        kind: "success",
+        message: "Запрос на паузе. Его можно возобновить позже."
+      });
+    })();
+  }
+
+  function handleClose(requestId: string) {
+    if (!window.confirm("Закрыть запрос как решённый? Активный поиск остановится.")) {
+      return;
+    }
+
+    const actionKey = buildRequestActionKey("close", requestId);
+
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
+    void (async () => {
+      setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message: "Закрываем запрос..."
+      });
+
+      const response = await mutateRequestList(
+        `/api/requests/${requestId}/close`,
+        "POST"
+      );
+      const result = (await response.json().catch(() => null)) as
+        | {
+            request?: SerializedRequest;
+            message?: string;
+          }
+        | null;
+
+      if (!response.ok || !result?.request) {
+        const message = result?.message ?? "Не удалось закрыть запрос.";
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
+        setFeedback({
+          kind: "error",
+          message
+        });
+        return;
+      }
+
+      setRequests((currentRequests) =>
+        upsertRequestInList(currentRequests, result.request!)
+      );
+
+      if (editingRequestId === requestId && selectedScenario) {
+        setEditingRequestId(null);
+        setDraft(createDefaultDraft(selectedScenario, subjects));
+      }
+
+      setActionStatus(actionKey, {
+        status: "success",
+        message: "Запрос закрыт."
+      });
+      setFeedback({
+        kind: "success",
+        message: "Запрос закрыт. Уже созданные связи остаются на месте."
+      });
+    })();
   }
 
   function handleRenew(requestId: string) {
-    startTransition(async () => {
+    const actionKey = buildRequestActionKey("renew", requestId);
+
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
+    void (async () => {
       setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message: "Возобновляем запрос..."
+      });
 
       const response = await mutateRequestList(
         `/api/requests/${requestId}/renew`,
@@ -650,9 +876,14 @@ export function RequestComposerShell({
         | null;
 
       if (!response.ok || !result?.request) {
+        const message = result?.message ?? "Не удалось обновить запрос.";
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
         setFeedback({
           kind: "error",
-          message: result?.message ?? "Не удалось обновить запрос."
+          message
         });
         return;
       }
@@ -662,11 +893,15 @@ export function RequestComposerShell({
       );
       startEditingRequest(result.request);
       setEditingRequestId(result.request.id);
+      setActionStatus(actionKey, {
+        status: "success",
+        message: "Запрос снова активен."
+      });
       setFeedback({
         kind: "success",
         message: "Запрос снова активен."
       });
-    });
+    })();
   }
 
   const latestForSelectedScenario = selectedScenario
@@ -681,29 +916,42 @@ export function RequestComposerShell({
       <div className="screen-copy">
         <h1 className="screen-title">Создать запрос</h1>
         <p className="screen-description">
-          Шаг 1 из 2 · задайте цель, роли, формат и время. Один активный
-          запрос на каждый сценарий.
+          Выберите сценарий и опишите, кого ищете. После публикации люди
+          смогут откликнуться, а подходящие появятся в разделе «Отклики».
         </p>
       </div>
 
       <div className="screen-grid">
         {requestScenarioOptions.map((scenario) => {
           const request = latestRequestsByScenario.get(scenario.value);
+          const badge = request ? getRequestStatusBadge(request) : null;
+          const archiveKey = request
+            ? buildRequestActionKey("archive", request.id)
+            : "";
+          const closeKey = request
+            ? buildRequestActionKey("close", request.id)
+            : "";
+          const pauseKey = request
+            ? buildRequestActionKey("pause", request.id)
+            : "";
+          const renewKey = request
+            ? buildRequestActionKey("renew", request.id)
+            : "";
 
           return (
             <Card key={scenario.value} eyebrow="Сценарий" title={scenario.label} data-selected={selectedScenario === scenario.value ? "true" : undefined}>
               <div className="screen-stack">
                 <span
                   className="tone-pill"
-                  data-tone={request ? requestStatusTone[request.status] : "neutral"}
+                  data-tone={badge?.tone ?? "neutral"}
                 >
-                  {request ? requestStatusLabels[request.status] : "запроса ещё нет"}
+                  {badge?.label ?? "Черновик"}
                 </span>
 
                 <p className="card-body-copy">
                   {request
                     ? summarizeRequest(request)
-                    : "Создайте короткий запрос и получите первые матчи."}
+                    : "Создайте короткий запрос и опубликуйте возможность."}
                 </p>
 
                 {request ? (
@@ -730,7 +978,36 @@ export function RequestComposerShell({
 
                   {request?.status === "ACTIVE" ? (
                     <Button
+                      disabled={hasBusyAction()}
                       fullWidth
+                      isLoading={isActionBusy(pauseKey)}
+                      loadingLabel="Ставим на паузу..."
+                      onClick={() => handlePause(request.id)}
+                      variant="ghost"
+                    >
+                      Пауза
+                    </Button>
+                  ) : null}
+
+                  {request?.status === "ACTIVE" ? (
+                    <Button
+                      disabled={hasBusyAction()}
+                      fullWidth
+                      isLoading={isActionBusy(closeKey)}
+                      loadingLabel="Закрываем..."
+                      onClick={() => handleClose(request.id)}
+                      variant="ghost"
+                    >
+                      Закрыть
+                    </Button>
+                  ) : null}
+
+                  {request ? (
+                    <Button
+                      disabled={hasBusyAction()}
+                      fullWidth
+                      isLoading={isActionBusy(archiveKey)}
+                      loadingLabel="Архивируем..."
                       onClick={() => handleArchive(request.id)}
                       variant="ghost"
                     >
@@ -738,9 +1015,12 @@ export function RequestComposerShell({
                     </Button>
                   ) : null}
 
-                  {request && request.status !== "ACTIVE" ? (
+                  {request?.status === "EXPIRED" ? (
                     <Button
+                      disabled={hasBusyAction()}
                       fullWidth
+                      isLoading={isActionBusy(renewKey)}
+                      loadingLabel="Возобновляем..."
                       onClick={() => handleRenew(request.id)}
                       variant="secondary"
                     >
@@ -754,8 +1034,12 @@ export function RequestComposerShell({
         })}
       </div>
 
-      <Card ref={formCardRef} eyebrow="Форма" title="Данные для подбора">
-        <form className="profile-form" onSubmit={handleSubmit}>
+      <Card ref={formCardRef} eyebrow="Форма" title="Данные для запроса">
+        <form
+          aria-busy={isActionBusy("save")}
+          className="profile-form"
+          onSubmit={handleSubmit}
+        >
           <div className="field-stack">
             <span className="field-label">Что вы ищете</span>
             <div className="toggle-grid">
@@ -792,15 +1076,23 @@ export function RequestComposerShell({
             </div>
           ) : null}
 
+          {isActionBusy("save") ? (
+            <div className="feedback-box">
+              <p className="feedback-title">
+                {getActionState("save").message ?? "Сохраняем изменения..."}
+              </p>
+            </div>
+          ) : null}
+
           <div className="request-inline-banner">
             <p className="helper-text">
               {selectedScenario
                 ? activeForSelectedScenario
                   ? "У вас уже есть активный запрос для этого сценария. Мы обновим его вместо создания нового."
                   : latestForSelectedScenario
-                    ? `Последний запрос сейчас имеет статус «${requestStatusLabels[latestForSelectedScenario.status]}».`
-                    : "Можно заполнить новый запрос и сразу перейти к подбору."
-                : "Выберите сценарий подбора. Это помогает системе понять, что именно искать: команду, партнёров проекта или партнёра для совместной учёбы."}
+                    ? `Последний запрос сейчас имеет статус «${getRequestStatusBadge(latestForSelectedScenario).label}».`
+                    : "Можно заполнить новый запрос и сразу перейти к откликам."
+                : "Выберите сценарий. Это помогает системе понять, что именно искать: команду, партнёров проекта или партнёра для совместной учёбы."}
             </p>
           </div>
 
@@ -1153,23 +1445,39 @@ export function RequestComposerShell({
                 onCourseYearChange={setStudyCourseYear}
                 onProgramIdChange={setStudyProgramId}
                 onSelectedCustomSubjectsChange={(values) =>
-                  setDraft({
-                    ...draft,
-                    details: {
-                      ...draft.details,
-                      customSubjectName: values[0] ?? "",
-                      subjectId: values.length > 0 ? "" : draft.details.subjectId
+                  setDraft((currentDraft) => {
+                    if (!currentDraft || currentDraft.scenario !== "STUDY") {
+                      return currentDraft;
                     }
+
+                    return {
+                      ...currentDraft,
+                      details: {
+                        ...currentDraft.details,
+                        customSubjectName: values[0] ?? "",
+                        subjectId:
+                          values.length > 0 ? "" : currentDraft.details.subjectId
+                      }
+                    };
                   })
                 }
                 onSelectedSubjectIdsChange={(values) =>
-                  setDraft({
-                    ...draft,
-                    details: {
-                      ...draft.details,
-                      subjectId: values[0] ?? "",
-                      customSubjectName: values.length > 0 ? "" : draft.details.customSubjectName
+                  setDraft((currentDraft) => {
+                    if (!currentDraft || currentDraft.scenario !== "STUDY") {
+                      return currentDraft;
                     }
+
+                    return {
+                      ...currentDraft,
+                      details: {
+                        ...currentDraft.details,
+                        subjectId: values[0] ?? "",
+                        customSubjectName:
+                          values.length > 0
+                            ? ""
+                            : currentDraft.details.customSubjectName
+                      }
+                    };
                   })
                 }
                 onStudyLevelChange={setStudyLevel}
@@ -1300,7 +1608,7 @@ export function RequestComposerShell({
           )}
 
           <label className="field-stack">
-            <span className="field-label">Заметки, если нужно</span>
+            <span className="field-label">Личная заметка</span>
             <textarea
               className="field-textarea"
               onChange={(event) =>
@@ -1311,18 +1619,21 @@ export function RequestComposerShell({
                     })
                   : null
               }
-              placeholder="Любые дополнительные вводные для будущего партнёра"
+              placeholder="Например: что уточнить перед откликом"
               rows={3}
               value={draft?.notes ?? ""}
             />
+            <span className="helper-text">Видна только вам</span>
           </label>
 
-          <Button disabled={isPending || !draft} fullWidth type="submit">
-            {isPending
-              ? "Сохраняем..."
-              : editingRequestId
-                ? "Сохранить изменения"
-                : "Создать запрос"}
+          <Button
+            disabled={hasBusyAction() || !draft}
+            fullWidth
+            isLoading={isActionBusy("save")}
+            loadingLabel="Сохраняем..."
+            type="submit"
+          >
+            {editingRequestId ? "Сохранить изменения" : "Создать запрос"}
           </Button>
         </form>
       </Card>
@@ -1330,21 +1641,29 @@ export function RequestComposerShell({
       <Card eyebrow="История" title="Ваши запросы">
         {requests.length === 0 ? (
           <p className="card-body-copy">
-            Создайте первый запрос, чтобы получить подбор по выбранному
-            сценарию и сразу перейти к кандидатам.
+            Создайте первый запрос, чтобы опубликовать возможность по
+            выбранному сценарию и сразу перейти к откликам.
           </p>
         ) : (
           <div className="request-history-list">
-            {requests.map((request) => (
+            {requests.map((request) => {
+              const archiveKey = buildRequestActionKey("archive", request.id);
+              const closeKey = buildRequestActionKey("close", request.id);
+              const pauseKey = buildRequestActionKey("pause", request.id);
+              const renewKey = buildRequestActionKey("renew", request.id);
+              const secondaryActionKey =
+                request.status === "EXPIRED" ? renewKey : archiveKey;
+
+              return (
               <div key={request.id} className="request-history-row">
                 <div className="request-history-copy">
                   <div className="request-history-head">
                     <strong>{summarizeRequest(request)}</strong>
                     <span
                       className="tone-pill"
-                      data-tone={requestStatusTone[request.status]}
+                      data-tone={getRequestStatusBadge(request).tone}
                     >
-                      {requestStatusLabels[request.status]}
+                      {getRequestStatusBadge(request).label}
                     </span>
                   </div>
                   <p className="helper-text">
@@ -1373,21 +1692,64 @@ export function RequestComposerShell({
                 <div className="request-card-actions">
                   {request.status === "ACTIVE" ? (
                     <>
-                      <Button onClick={() => startEditingRequest(request)} variant="secondary">
+                      <Button
+                        disabled={hasBusyAction()}
+                        onClick={() => startEditingRequest(request)}
+                        variant="secondary"
+                      >
                         Редактировать
                       </Button>
-                      <Button onClick={() => handleArchive(request.id)} variant="ghost">
+                      <Button
+                        disabled={hasBusyAction()}
+                        isLoading={isActionBusy(pauseKey)}
+                        loadingLabel="Ставим на паузу..."
+                        onClick={() => handlePause(request.id)}
+                        variant="ghost"
+                      >
+                        Пауза
+                      </Button>
+                      <Button
+                        disabled={hasBusyAction()}
+                        isLoading={isActionBusy(closeKey)}
+                        loadingLabel="Закрываем..."
+                        onClick={() => handleClose(request.id)}
+                        variant="ghost"
+                      >
+                        Закрыть
+                      </Button>
+                      <Button
+                        disabled={hasBusyAction()}
+                        isLoading={isActionBusy(archiveKey)}
+                        loadingLabel="Архивируем..."
+                        onClick={() => handleArchive(request.id)}
+                        variant="ghost"
+                      >
                         Архивировать
                       </Button>
                     </>
                   ) : (
-                    <Button onClick={() => handleRenew(request.id)} variant="secondary">
-                      Возобновить
+                    <Button
+                      disabled={hasBusyAction()}
+                      isLoading={isActionBusy(secondaryActionKey)}
+                      loadingLabel={
+                        request.status === "EXPIRED"
+                          ? "Возобновляем..."
+                          : "Архивируем..."
+                      }
+                      onClick={() =>
+                        request.status === "EXPIRED"
+                          ? handleRenew(request.id)
+                          : handleArchive(request.id)
+                      }
+                      variant="secondary"
+                    >
+                      {request.status === "EXPIRED" ? "Возобновить" : "Архивировать"}
                     </Button>
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>

@@ -28,6 +28,7 @@ export default async function NewRequestPage({ searchParams }: NewRequestPagePro
     <RequestComposerShell
       initialScenario={resolveScenarioParam(resolvedSearchParams?.scenario)}
       initialRequests={composerData.requests}
+      key={user.id}
       studyDefaults={composerData.studyDefaults}
       subjects={composerData.subjects}
     />

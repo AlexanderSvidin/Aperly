@@ -7,51 +7,61 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useTelegramApp } from "@/features/telegram/components/telegram-app-provider";
+import {
+  useTelegramApp,
+  useTelegramDetecting
+} from "@/features/telegram/components/telegram-app-provider";
 import { TELEGRAM_INIT_DATA_HEADER } from "@/lib/telegram/constants";
 
 type AuthErrorState = {
   message: string;
 };
 
-function getRuntimeHint(
-  source: "telegram" | "dev" | "browser",
-  hasInitData: boolean,
-  hasTelegramWebApp: boolean
-) {
-  if (source === "telegram" && hasInitData) {
+function getRuntimeHint(source: "telegram" | "dev" | "browser") {
+  if (source === "telegram") {
     return "Приложение открыто в Telegram. Можно продолжить без отдельной регистрации.";
-  }
-
-  if (source === "telegram" || hasTelegramWebApp) {
-    return "Telegram WebApp найден, но initData пустой. Откройте Aperly через кнопку Mini App в Telegram.";
   }
 
   if (source === "dev") {
     return "Включён локальный режим разработки. Он доступен только при явном серверном флаге.";
   }
 
-  return "Откройте Aperly из Telegram или включите локальный режим разработки.";
+  return "Откройте Aperly через кнопку Mini App в Telegram.";
 }
 
 export function AuthEntryCard() {
   const router = useRouter();
   const telegram = useTelegramApp();
-  const liveWebApp =
-    typeof window !== "undefined" ? window.Telegram?.WebApp : null;
-  const hasTelegramWebApp =
-    Boolean(liveWebApp);
-  const telegramInitData = telegram.initData || liveWebApp?.initData || null;
+  const isDetecting = useTelegramDetecting();
   const [error, setError] = useState<AuthErrorState | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Enable as soon as the Telegram WebApp object is present.
-  // We do NOT gate on initData here because webApp.initData can legitimately
-  // be an empty string "" on first render (treated as falsy by ||), which
-  // would leave the button permanently disabled.  initData is re-read fresh
-  // at click time inside handleSubmit below.
-  const canUseTelegramAuth = hasTelegramWebApp;
+  // ------------------------------------------------------------------
+  // Loading skeleton — shown while we poll for window.Telegram.WebApp.
+  // This prevents Telegram's white loading overlay from appearing empty
+  // and ensures the button is never visible before WebApp.ready() has
+  // been called (which would leave touches blocked by the WebView).
+  // Both the SSR render and the first client render see isDetecting=true
+  // (the context default), so there is no hydration mismatch.
+  // ------------------------------------------------------------------
+  if (isDetecting) {
+    return (
+      <Card eyebrow="Быстрый вход" title="Начать">
+        <div className="screen-stack">
+          <p className="card-body-copy auth-card-loading-hint">
+            Инициализируем Telegram…
+          </p>
+          <div className="button button-primary button-full auth-card-loading-btn" aria-hidden="true" />
+        </div>
+      </Card>
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Resolved state — SDK detection is complete
+  // ------------------------------------------------------------------
   const canUseDevAuth = telegram.source === "dev";
+  const canUseTelegramAuth = telegram.source === "telegram";
   const canAuthenticate = canUseTelegramAuth || canUseDevAuth;
 
   const primaryButtonLabel = canUseDevAuth
@@ -66,14 +76,10 @@ export function AuthEntryCard() {
       const headers: HeadersInit = {};
 
       if (canUseTelegramAuth) {
-        // Re-read initData at click time: the context value (telegram.initData)
-        // may still be null on first render, but window.Telegram.WebApp.initData
-        // is the authoritative live value populated by the Telegram SDK.
+        // Re-read initData at click time — it is the most authoritative source
+        // and may have been set after the initial provider snapshot.
         const freshInitData =
-          window.Telegram?.WebApp?.initData ||
-          telegram.initData ||
-          telegramInitData ||
-          null;
+          window.Telegram?.WebApp?.initData || telegram.initData || null;
 
         if (freshInitData) {
           headers[TELEGRAM_INIT_DATA_HEADER] = freshInitData;
@@ -81,15 +87,13 @@ export function AuthEntryCard() {
       }
 
       const response = await fetch(endpoint, {
+        cache: "no-store",
         method: "POST",
         headers
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | {
-            message?: string;
-            redirectTo?: string;
-          }
+        | { message?: string; redirectTo?: string }
         | null;
 
       if (!response.ok) {
@@ -102,25 +106,20 @@ export function AuthEntryCard() {
         setError({
           message:
             payload?.message ??
-            "Не удалось войти. Проверьте, что приложение открыто в Telegram или включён локальный режим разработки."
+            "Не удалось войти. Проверьте, что приложение открыто через Telegram."
         });
         return;
       }
 
-      router.push((payload?.redirectTo ?? "/home") as Route);
-      router.refresh();
+      window.location.assign(payload?.redirectTo ?? "/home");
     });
   }
 
   return (
     <Card eyebrow="Быстрый вход" title="Начать">
       <div className="screen-stack">
-        <p className="card-body-copy" suppressHydrationWarning>
-          {getRuntimeHint(
-            telegram.source,
-            Boolean(telegramInitData),
-            hasTelegramWebApp
-          )}
+        <p className="card-body-copy">
+          {getRuntimeHint(telegram.source)}
         </p>
 
         {error ? <p className="error-text">{error.message}</p> : null}
@@ -129,8 +128,9 @@ export function AuthEntryCard() {
           fullWidth
           disabled={!canAuthenticate || isPending}
           onClick={handleSubmit}
+          type="button"
         >
-          {isPending ? "Проверяем доступ..." : primaryButtonLabel}
+          {isPending ? "Проверяем доступ…" : primaryButtonLabel}
         </Button>
 
         <p className="helper-text">

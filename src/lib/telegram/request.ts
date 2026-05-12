@@ -19,6 +19,7 @@ export function resolveTelegramRequestContext(
   }
 
   if (
+    process.env.NODE_ENV !== "production" &&
     telegramServerEnv.ALLOW_DEV_TELEGRAM_FALLBACK &&
     telegramServerEnv.DEV_TELEGRAM_INIT_DATA
   ) {

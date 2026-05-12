@@ -437,5 +437,102 @@ export const profileService = {
       matchingRelevantFieldsChanged: beforeFingerprint !== afterFingerprint,
       user: result.user
     };
+  },
+
+  async deleteProfile(userId: string) {
+    const now = new Date();
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.request.updateMany({
+        where: {
+          ownerId: userId,
+          status: "ACTIVE"
+        },
+        data: {
+          status: "DELETED",
+          closedAt: now
+        }
+      });
+
+      await transaction.match.updateMany({
+        where: {
+          OR: [
+            {
+              sourceRequest: {
+                is: {
+                  ownerId: userId
+                }
+              }
+            },
+            {
+              candidateRequest: {
+                is: {
+                  ownerId: userId
+                }
+              }
+            },
+            {
+              candidateProfile: {
+                is: {
+                  userId
+                }
+              }
+            }
+          ],
+          status: {
+            in: ["READY", "PENDING_RECIPIENT_ACCEPTANCE"]
+          }
+        },
+        data: {
+          status: "CLOSED",
+          expiresAt: now
+        }
+      });
+
+      await transaction.chat.updateMany({
+        where: {
+          OR: [{ userAId: userId }, { userBId: userId }],
+          status: {
+            in: ["ACTIVE", "STALE"]
+          }
+        },
+        data: {
+          status: "CLOSED",
+          closedAt: now
+        }
+      });
+
+      await transaction.profile.updateMany({
+        where: {
+          userId
+        },
+        data: {
+          fullName: "Удалённый профиль",
+          bio: null,
+          isDiscoverable: false,
+          discoverableScenarios: [],
+          telegramUsername: null,
+          phone: null,
+          preferredFormats: [],
+          preferredRoles: []
+        }
+      });
+
+      await transaction.user.update({
+        where: {
+          id: userId
+        },
+        data: {
+          status: "DELETED",
+          onboardingCompleted: false,
+          username: null,
+          firstName: "Удалённый",
+          lastName: null,
+          deletedAt: now
+        }
+      });
+    });
+
+    return { deleted: true as const };
   }
 };

@@ -11,9 +11,9 @@ export const chatScenarioLabels = Object.fromEntries(
 ) as Record<(typeof requestScenarioOptions)[number]["value"], string>;
 
 export const chatStatusLabels: Record<SerializedChatListItem["status"], string> = {
-  ACTIVE: "Диалог активен",
+  ACTIVE: "Можно связаться",
   STALE: "Ожидает ответа",
-  CLOSED: "Диалог закрыт",
+  CLOSED: "Контакт закрыт",
   BLOCKED: "Доступ ограничен"
 };
 
@@ -28,7 +28,7 @@ export const chatStatusTone: Record<
 };
 
 export const staleStatusLabels: Record<ChatStaleStatus, string> = {
-  FRESH: "Свежий диалог",
+  FRESH: "Свежий контакт",
   AWAITING_REPLY: "Ожидает ответа"
 };
 
@@ -36,8 +36,8 @@ export const contactExchangeStatusLabels: Record<
   ContactExchangeStatusValue,
   string
 > = {
-  NOT_REQUESTED: "Контакты ещё не открыты",
-  REQUESTED_ONE_SIDED: "Нужен ответ на обмен контактами",
-  MUTUAL_CONSENT: "Контакты открыты",
-  DECLINED: "Обмен контактами отклонён"
+  NOT_REQUESTED: "Контакт недоступен",
+  REQUESTED_ONE_SIDED: "Отклик отправлен",
+  MUTUAL_CONSENT: "Можно связаться",
+  DECLINED: "Контакт недоступен"
 };

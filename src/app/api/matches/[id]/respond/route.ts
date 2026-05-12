@@ -30,7 +30,7 @@ function buildErrorResponse(error: unknown) {
     );
   }
   return NextResponse.json(
-    { message: "Не удалось ответить на приглашение." },
+    { message: "Не удалось ответить на отклик." },
     { status: 500 }
   );
 }

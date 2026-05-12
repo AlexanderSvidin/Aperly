@@ -9,6 +9,13 @@ export type MatchStatusValue =
   | "CLOSED";
 export type MatchChatReadiness = "READY_FOR_CHAT" | "INVITE_REQUIRED";
 
+export type MatchResponseStatus =
+  | "NONE"
+  | "SENT"
+  | "RECEIVED"
+  | "ACCEPTED"
+  | "DECLINED";
+
 export type SerializedMatchDimension = {
   key: string;
   label: string;
@@ -39,16 +46,30 @@ export type SerializedMatchRequestCard = {
   ownerDisplayName: string;
 };
 
+export type SerializedMatchResponse = {
+  status: MatchResponseStatus;
+  introMessage: string | null;
+  sentByMe: boolean;
+  canSendIntro: boolean;
+  canAccept: boolean;
+  canDecline: boolean;
+  telegramUsername: string | null;
+  telegramUrl: string | null;
+  contactHint: string;
+};
+
 export type SerializedMatchListItem = {
   id: string;
   mode: MatchModeValue;
   status: MatchStatusValue;
   score: number;
   reasonSummary: string;
+  reasons: string[];
   dimensions: SerializedMatchDimension[];
   candidateProfile: SerializedMatchProfileCard;
   candidateRequest: SerializedMatchRequestCard | null;
   chatReadiness: MatchChatReadiness;
+  response: SerializedMatchResponse;
   computedAt: string;
   expiresAt: string | null;
 };

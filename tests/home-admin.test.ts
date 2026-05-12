@@ -1,16 +1,23 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { after, test } from "node:test";
 
 import { prisma } from "@/server/db/client";
 import { validateTelegramInitData } from "@/server/services/auth/telegram-init-data";
 import { chatService } from "@/server/services/chat/chat-service";
+import { getMatchUiStatus } from "@/features/matching/lib/match-options";
 import {
   buildHomeLatestMatches,
   buildHomeRequestItem
 } from "@/server/services/home/home-presenters";
 import { homeService } from "@/server/services/home/home-service";
+import {
+  buildPublicMatchReasons,
+  matchingService
+} from "@/server/services/matching/matching-service";
 import { moderationService } from "@/server/services/moderation/moderation-service";
+import { profileService } from "@/server/services/profile/profile-service";
 import { requestService } from "@/server/services/requests/request-service";
 import { studySessionService } from "@/server/services/study-sessions/study-session-service";
 
@@ -261,8 +268,299 @@ function buildSignedTelegramInitData(params: {
   return searchParams.toString();
 }
 
+function buildEmptyMatchResponse() {
+  return {
+    status: "NONE" as const,
+    introMessage: null,
+    sentByMe: false,
+    canSendIntro: true,
+    canAccept: false,
+    canDecline: false,
+    telegramUsername: null,
+    telegramUrl: null,
+    contactHint: "Контакт откроется после принятия отклика."
+  };
+}
+
 after(async () => {
   await prisma.$disconnect();
+});
+
+test("match UI status mapping hides technical backend statuses", () => {
+  assert.deepEqual(
+    getMatchUiStatus({
+      mode: "REQUEST_TO_REQUEST",
+      status: "READY",
+      chatReadiness: "READY_FOR_CHAT",
+      response: {
+        status: "NONE",
+        introMessage: null,
+        sentByMe: false,
+        canSendIntro: true,
+        canAccept: false,
+        canDecline: false,
+        telegramUsername: null,
+        telegramUrl: null,
+        contactHint: "Контакт откроется после принятия отклика."
+      }
+    }),
+    {
+      label: "Можно откликнуться",
+      tone: "success",
+      nextAction: "Откликнуться",
+      canAct: true
+    }
+  );
+
+  assert.deepEqual(
+    getMatchUiStatus({
+      mode: "REQUEST_TO_PROFILE",
+      status: "PENDING_RECIPIENT_ACCEPTANCE",
+      chatReadiness: "INVITE_REQUIRED",
+      response: {
+        status: "SENT",
+        introMessage: "Хочу присоединиться к запросу.",
+        sentByMe: true,
+        canSendIntro: false,
+        canAccept: false,
+        canDecline: false,
+        telegramUsername: null,
+        telegramUrl: null,
+        contactHint: "Контакт скрыт до принятия отклика."
+      }
+    }),
+    {
+      label: "Отклик отправлен",
+      tone: "warning",
+      nextAction: "Ждём ответа",
+      canAct: false
+    }
+  );
+
+  assert.equal(
+    getMatchUiStatus({
+      mode: "REQUEST_TO_PROFILE",
+      status: "EXPIRED",
+      chatReadiness: "INVITE_REQUIRED",
+      response: {
+        status: "NONE",
+        introMessage: null,
+        sentByMe: false,
+        canSendIntro: false,
+        canAccept: false,
+        canDecline: false,
+        telegramUsername: null,
+        telegramUrl: null,
+        contactHint: "Контакт откроется после принятия отклика."
+      }
+    }).label,
+    "Истекло"
+  );
+});
+
+test("buildPublicMatchReasons returns deterministic human reasons", () => {
+  assert.deepEqual(
+    buildPublicMatchReasons([
+      { key: "format_fit", label: "Предпочитаемый формат", score: 10 },
+      { key: "subject_fit", label: "Предмет", score: 35 },
+      { key: "skill_fit", label: "Навыки", score: 18 },
+      { key: "profile_completeness", label: "Профиль", score: 0 },
+      { key: "availability_overlap", label: "Время", score: 12 }
+    ]),
+    [
+      "Совпадает предмет",
+      "Есть нужный навык",
+      "Похоже удобное время",
+      "Подходит формат"
+    ]
+  );
+});
+
+test("chatService does not duplicate fallback invites", async () => {
+  const context = buildContext("duplicate_invite");
+
+  try {
+    const owner = await createUser(context, { firstName: "InviteOwner" });
+    const recipient = await createUser(context, { firstName: "InviteRecipient" });
+    const subject = await createSubject(context);
+    const sourceRequest = await createStudyRequest(context, owner.id, subject.id);
+
+    const match = await prisma.match.create({
+      data: {
+        pairKey: `${context.prefix}_fallback_pair`,
+        scenario: "STUDY",
+        mode: "REQUEST_TO_PROFILE",
+        status: "PENDING_RECIPIENT_ACCEPTANCE",
+        sourceRequestId: sourceRequest.id,
+        candidateProfileId: recipient.profile!.id,
+        score: 72,
+        reasonSummary: `${context.prefix} fallback reason`,
+        reasonDetails: {
+          dimensions: [
+            { key: "subject_fit", label: "Предмет", score: 35 },
+            { key: "format_fit", label: "Формат", score: 10 }
+          ]
+        },
+        computedAt: new Date(),
+        expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+      }
+    });
+    context.matchIds.push(match.id);
+
+    const firstResult = await chatService.openFromMatch(
+      owner.id,
+      match.id,
+      "Хочу обсудить совместную подготовку и удобное время."
+    );
+    const secondResult = await chatService.openFromMatch(
+      owner.id,
+      match.id,
+      "Хочу обсудить совместную подготовку и удобное время."
+    );
+    const storedMatch = await prisma.match.findUniqueOrThrow({
+      where: { id: match.id },
+      include: { chat: true }
+    });
+
+    assert.deepEqual(firstResult, { status: "RESPONSE_SENT", matchId: match.id });
+    assert.deepEqual(secondResult, { status: "RESPONSE_SENT", matchId: match.id });
+    assert.equal(storedMatch.status, "PENDING_RECIPIENT_ACCEPTANCE");
+    assert.equal(storedMatch.chat, null);
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("response intro can be created and accepted without opening chat first", async () => {
+  const context = buildContext("intro_accept");
+
+  try {
+    const sender = await createUser(context, { firstName: "IntroSender" });
+    const recipient = await createUser(context, { firstName: "IntroRecipient" });
+    const subject = await createSubject(context);
+    const senderRequest = await createStudyRequest(context, sender.id, subject.id);
+    const recipientRequest = await createStudyRequest(context, recipient.id, subject.id);
+
+    const match = await prisma.match.create({
+      data: {
+        pairKey: `${context.prefix}_request_pair`,
+        scenario: "STUDY",
+        mode: "REQUEST_TO_REQUEST",
+        status: "READY",
+        sourceRequestId: senderRequest.id,
+        candidateRequestId: recipientRequest.id,
+        score: 82,
+        reasonSummary: `${context.prefix} request reason`,
+        reasonDetails: {
+          dimensions: [
+            { key: "subject_fit", label: "Предмет", score: 35 },
+            { key: "availability_overlap", label: "Время", score: 20 }
+          ]
+        },
+        computedAt: new Date(),
+        expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+      }
+    });
+    context.matchIds.push(match.id);
+
+    const intro = "Я уже разбирал этот предмет и предлагаю созвониться на неделе.";
+    const sent = await chatService.openFromMatch(sender.id, match.id, intro);
+    const recipientMatches = await matchingService.listForOwnedRequest(
+      recipient.id,
+      recipientRequest.id
+    );
+    const receivedMatch = recipientMatches.matches.find((item) => item.id === match.id);
+
+    assert.deepEqual(sent, { status: "RESPONSE_SENT", matchId: match.id });
+    assert.equal(receivedMatch?.response.status, "RECEIVED");
+    assert.equal(receivedMatch?.response.introMessage, intro);
+    assert.equal(receivedMatch?.response.canAccept, true);
+
+    const accepted = await chatService.respondToFallbackInvite(
+      recipient.id,
+      match.id,
+      "ACCEPT"
+    );
+    assert.equal(accepted.status, "ACCEPTED");
+    if (accepted.status === "ACCEPTED") {
+      context.chatIds.push(accepted.chatId);
+      assert.equal(
+        accepted.telegramUsername,
+        sender.username?.replace(/^@+/, "") ?? null
+      );
+      assert.ok(accepted.telegramUrl?.startsWith("https://t.me/"));
+    }
+
+    const chatCount = await prisma.chat.count({
+      where: { matchId: match.id }
+    });
+    assert.equal(chatCount, 1);
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("archived requests are hidden from Home feed", async () => {
+  const context = buildContext("archive_home");
+
+  try {
+    const owner = await createUser(context, { firstName: "ArchiveOwner" });
+    const viewer = await createUser(context, { firstName: "ArchiveViewer" });
+    const subject = await createSubject(context);
+    const request = await createStudyRequest(context, owner.id, subject.id);
+
+    await requestService.archive(
+      {
+        id: owner.id,
+        status: owner.status,
+        onboardingCompleted: owner.onboardingCompleted
+      },
+      request.id
+    );
+
+    const feed = await homeService.getFeedForUser(viewer.id);
+
+    assert.equal(
+      feed.opportunities.some((opportunity) => opportunity.id === request.id),
+      false
+    );
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("deleted profile is hidden from discovery and matching fallback", async () => {
+  const context = buildContext("delete_profile");
+
+  try {
+    const deletedUser = await createUser(context, { firstName: "DeletedCandidate" });
+    const viewer = await createUser(context, { firstName: "DeleteViewer" });
+    const subject = await createSubject(context);
+    await createStudyRequest(context, deletedUser.id, subject.id);
+
+    await profileService.deleteProfile(deletedUser.id);
+
+    const feed = await homeService.getFeedForUser(viewer.id);
+
+    assert.equal(
+      feed.opportunities.some((opportunity) =>
+        opportunity.author.name.includes("DeletedCandidate")
+      ),
+      false
+    );
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("request notes use private label copy", () => {
+  const componentSource = readFileSync(
+    new URL("../src/features/requests/components/request-composer-shell.tsx", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(componentSource, /Личная заметка/);
+  assert.match(componentSource, /Видна только вам/);
 });
 
 test("buildHomeRequestItem summarizes StudyBuddy request data", () => {
@@ -316,6 +614,7 @@ test("buildHomeLatestMatches sorts by recency first and score second", () => {
           status: "READY",
           score: 99,
           reasonSummary: "older high score",
+          reasons: [],
           dimensions: [],
           candidateProfile: {
             id: "profile-1",
@@ -332,6 +631,7 @@ test("buildHomeLatestMatches sorts by recency first and score second", () => {
           },
           candidateRequest: null,
           chatReadiness: "READY_FOR_CHAT",
+          response: buildEmptyMatchResponse(),
           computedAt: "2026-04-20T10:00:00.000Z",
           expiresAt: null
         },
@@ -341,6 +641,7 @@ test("buildHomeLatestMatches sorts by recency first and score second", () => {
           status: "READY",
           score: 70,
           reasonSummary: "newer low score",
+          reasons: [],
           dimensions: [],
           candidateProfile: {
             id: "profile-2",
@@ -357,6 +658,7 @@ test("buildHomeLatestMatches sorts by recency first and score second", () => {
           },
           candidateRequest: null,
           chatReadiness: "INVITE_REQUIRED",
+          response: buildEmptyMatchResponse(),
           computedAt: "2026-04-21T10:00:00.000Z",
           expiresAt: null
         }
@@ -370,101 +672,39 @@ test("buildHomeLatestMatches sorts by recency first and score second", () => {
   );
 });
 
-test("homeService composes dashboard with active requests, chats and StudyBuddy session", async () => {
-  const context = buildContext("home");
+test("homeService feed excludes current user and inactive requests", async () => {
+  const context = buildContext("home_feed");
 
   try {
-    const owner = await createUser(context, { firstName: "Owner" });
+    const viewer = await createUser(context, { firstName: "Viewer" });
     const partner = await createUser(context, { firstName: "Partner" });
+    const inactiveOwner = await createUser(context, { firstName: "InactiveOwner" });
     const subject = await createSubject(context);
-    const ownerRequest = await createStudyRequest(context, owner.id, subject.id);
+    const ownRequest = await createStudyRequest(context, viewer.id, subject.id);
     const partnerRequest = await createStudyRequest(context, partner.id, subject.id);
-
-    const match = await prisma.match.create({
-      data: {
-        pairKey: `${context.prefix}_pair`,
-        scenario: "STUDY",
-        mode: "REQUEST_TO_REQUEST",
-        status: "READY",
-        sourceRequestId: ownerRequest.id,
-        candidateRequestId: partnerRequest.id,
-        score: 88,
-        reasonSummary: `${context.prefix} matching reason`,
-        computedAt: new Date(),
-        expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
-      }
-    });
-    context.matchIds.push(match.id);
-
-    const chat = await prisma.chat.create({
-      data: {
-        matchId: match.id,
-        userAId: owner.id,
-        userBId: partner.id,
-        status: "ACTIVE",
-        lastMessageAt: new Date(),
-        staleAfterAt: new Date(Date.now() + 72 * 60 * 60 * 1000)
-      }
-    });
-    context.chatIds.push(chat.id);
-
-    await prisma.message.create({
-      data: {
-        chatId: chat.id,
-        senderId: owner.id,
-        type: "USER",
-        text: `${context.prefix} hello`
-      }
-    });
-
-    const upcomingSession = await prisma.session.create({
-      data: {
-        matchId: match.id,
-        chatId: chat.id,
-        scheduledByUserId: owner.id,
-        sequenceNumber: 1,
-        scheduledFor: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        format: "ONLINE",
-        notes: `${context.prefix} upcoming`,
-        status: "CONFIRMED",
-        nextAction: "NONE",
-        confirmedAt: new Date()
-      }
-    });
-    context.sessionIds.push(upcomingSession.id);
-
-    const completedSession = await prisma.session.create({
-      data: {
-        matchId: match.id,
-        chatId: chat.id,
-        scheduledByUserId: owner.id,
-        sequenceNumber: 2,
-        scheduledFor: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        format: "ONLINE",
-        notes: `${context.prefix} completed`,
-        status: "COMPLETED",
-        nextAction: "SCHEDULE_NEXT",
-        completedAt: new Date()
-      }
-    });
-    context.sessionIds.push(completedSession.id);
-
-    const dashboard = await homeService.getDashboardForUser(owner.id);
-
-    assert.equal(dashboard.activeRequests.length, 1);
-    assert.equal(dashboard.activeRequests[0]?.title, `${context.prefix} Subject`);
-    assert.equal(dashboard.latestMatches.length, 1);
-    assert.equal(dashboard.latestMatches[0]?.candidateName, partner.profile?.fullName);
-    assert.equal(dashboard.activeChats.length, 1);
-    assert.equal(
-      dashboard.activeChats[0]?.otherUser.displayName,
-      partner.profile?.fullName
+    const inactiveRequest = await createStudyRequest(
+      context,
+      inactiveOwner.id,
+      subject.id
     );
-    assert.equal(dashboard.upcomingStudySession?.subjectName, `${context.prefix} Subject`);
-    assert.equal(dashboard.upcomingStudySession?.chatId, chat.id);
-    assert.equal(dashboard.studyContinuation?.recommendedAction, "SCHEDULE_NEXT");
-    assert.equal(dashboard.studyContinuation?.canFindNewPartner, true);
-    assert.equal(dashboard.primaryCta.href, "/requests/new");
+
+    await prisma.request.update({
+      where: { id: inactiveRequest.id },
+      data: { status: "CLOSED", closedAt: new Date() }
+    });
+
+    const feed = await homeService.getFeedForUser(viewer.id);
+    const studyFeed = await homeService.getFeedForUser(viewer.id, {
+      scenario: "STUDY"
+    });
+
+    assert.ok(feed.opportunities.some((item) => item.id === partnerRequest.id));
+    assert.ok(!feed.opportunities.some((item) => item.id === ownRequest.id));
+    assert.ok(!feed.opportunities.some((item) => item.id === inactiveRequest.id));
+    assert.equal(studyFeed.opportunities.length, 1);
+    assert.equal(studyFeed.opportunities[0]?.scenario, "STUDY");
+    assert.equal(studyFeed.opportunities[0]?.ctaLabel, "Открыть отклики");
+    assert.equal(feed.primaryCta.href, "/requests/new");
   } finally {
     await cleanupContext(context);
   }
@@ -678,8 +918,17 @@ test("requestService creates StudyBuddy request and recomputes R2R matches", asy
       }
     });
     context.matchIds.push(...matches.map((match) => match.id));
+    const screenData = await matchingService.getScreenDataForUser(owner.id, {
+      requestId: created.id
+    });
 
     assert.equal(created.details.type, "STUDY");
+    assert.equal(screenData.selectedRequestId, created.id);
+    assert.ok(
+      screenData.selectedRequestMatches?.matches.some((match) =>
+        matches.some((storedMatch) => storedMatch.id === match.id)
+      )
+    );
     assert.ok(
       matches.some(
         (match) =>
@@ -687,6 +936,219 @@ test("requestService creates StudyBuddy request and recomputes R2R matches", asy
           (match.sourceRequestId === partnerRequest.id ||
             match.candidateRequestId === partnerRequest.id)
       )
+    );
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("requestService creates StudyBuddy request with a custom subject without duplicates", async () => {
+  const context = buildContext("request_custom_subject");
+  const customSubjectName = `${context.prefix} Applied Metrics`;
+
+  try {
+    const owner = await createUser(context, { firstName: "CustomOwner" });
+    const secondOwner = await createUser(context, { firstName: "CustomOwnerTwo" });
+
+    const created = await requestService.create(
+      {
+        id: owner.id,
+        status: "ACTIVE",
+        onboardingCompleted: true
+      },
+      {
+        scenario: "STUDY",
+        notes: "",
+        availabilitySlots: [],
+        details: {
+          subjectId: null,
+          customSubjectName: `  ${customSubjectName}  `,
+          currentContext: `${context.prefix} preparing for custom subject exam`,
+          goal: `${context.prefix} build a repeatable study plan`,
+          desiredFrequency: "WEEKLY",
+          preferredTime: "EVENING",
+          preferredFormat: "ONLINE"
+        }
+      }
+    );
+    context.requestIds.push(created.id);
+
+    const reused = await requestService.create(
+      {
+        id: secondOwner.id,
+        status: "ACTIVE",
+        onboardingCompleted: true
+      },
+      {
+        scenario: "STUDY",
+        notes: "",
+        availabilitySlots: [],
+        details: {
+          subjectId: null,
+          customSubjectName: customSubjectName.toLowerCase(),
+          currentContext: `${context.prefix} another custom subject context`,
+          goal: `${context.prefix} compare solutions every week`,
+          desiredFrequency: "WEEKLY",
+          preferredTime: "EVENING",
+          preferredFormat: "ONLINE"
+        }
+      }
+    );
+    context.requestIds.push(reused.id);
+
+    assert.equal(created.details.type, "STUDY");
+    assert.equal(reused.details.type, "STUDY");
+
+    if (created.details.type === "STUDY" && reused.details.type === "STUDY") {
+      assert.equal(created.details.subjectName, customSubjectName);
+      assert.equal(reused.details.subjectId, created.details.subjectId);
+      context.subjectIds.push(created.details.subjectId);
+    }
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("requestService updates active request details and keeps existing chatted matches", async () => {
+  const context = buildContext("request_update");
+
+  try {
+    const owner = await createUser(context, { firstName: "UpdateOwner" });
+    const partner = await createUser(context, { firstName: "UpdatePartner" });
+    const ownerRequest = await createProjectRequest(context, owner.id);
+    const partnerRequest = await createProjectRequest(context, partner.id);
+
+    const match = await prisma.match.create({
+      data: {
+        pairKey: `${context.prefix}_update_pair`,
+        scenario: "PROJECT",
+        mode: "REQUEST_TO_REQUEST",
+        status: "READY",
+        sourceRequestId: ownerRequest.id,
+        candidateRequestId: partnerRequest.id,
+        score: 91,
+        reasonSummary: `${context.prefix} existing chatted match`,
+        computedAt: new Date(),
+        expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+      }
+    });
+    context.matchIds.push(match.id);
+
+    const chat = await prisma.chat.create({
+      data: {
+        matchId: match.id,
+        userAId: owner.id,
+        userBId: partner.id,
+        status: "ACTIVE",
+        lastMessageAt: new Date(),
+        staleAfterAt: new Date(Date.now() + 72 * 60 * 60 * 1000)
+      }
+    });
+    context.chatIds.push(chat.id);
+
+    const updated = await requestService.update(
+      {
+        id: owner.id,
+        status: "ACTIVE",
+        onboardingCompleted: true
+      },
+      ownerRequest.id,
+      {
+        scenario: "PROJECT",
+        notes: "Updated notes",
+        availabilitySlots: [],
+        details: {
+          projectTitle: `${context.prefix} Updated Project`,
+          shortDescription: `${context.prefix} updated project description for request lifecycle`,
+          stage: "EARLY_TRACTION",
+          neededRoles: ["DESIGNER"],
+          expectedCommitment: "FLEXIBLE",
+          preferredFormat: "HYBRID"
+        }
+      }
+    );
+
+    const existingMatch = await prisma.match.findUnique({
+      where: { id: match.id },
+      include: { chat: true }
+    });
+
+    assert.equal(updated.details.type, "PROJECT");
+    if (updated.details.type === "PROJECT") {
+      assert.equal(updated.details.projectTitle, `${context.prefix} Updated Project`);
+      assert.equal(updated.details.stage, "EARLY_TRACTION");
+    }
+    assert.equal(existingMatch?.chat?.id, chat.id);
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("requestService pauses, resumes, closes and archives requests", async () => {
+  const context = buildContext("request_lifecycle");
+
+  try {
+    const owner = await createUser(context, { firstName: "LifecycleOwner" });
+    const request = await createProjectRequest(context, owner.id);
+    const actor = {
+      id: owner.id,
+      status: "ACTIVE" as const,
+      onboardingCompleted: true
+    };
+
+    const paused = await requestService.pause(actor, request.id);
+    assert.equal(paused.status, "EXPIRED");
+
+    const resumed = await requestService.renew(actor, request.id);
+    assert.equal(resumed.status, "ACTIVE");
+
+    const closed = await requestService.close(actor, request.id);
+    assert.equal(closed.status, "CLOSED");
+    assert.ok(closed.closedAt);
+
+    const archived = await requestService.archive(actor, request.id);
+    assert.equal(archived.status, "DELETED");
+
+    const visibleRequests = await requestService.listForUser(owner.id);
+    assert.equal(
+      visibleRequests.some((visibleRequest) => visibleRequest.id === request.id),
+      false
+    );
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("requestService returns validation errors for invalid StudyBuddy subjects", async () => {
+  const context = buildContext("request_validation");
+
+  try {
+    const owner = await createUser(context, { firstName: "ValidationOwner" });
+
+    await assert.rejects(
+      () =>
+        requestService.create(
+          {
+            id: owner.id,
+            status: "ACTIVE",
+            onboardingCompleted: true
+          },
+          {
+            scenario: "STUDY",
+            notes: "",
+            availabilitySlots: [],
+            details: {
+              subjectId: null,
+              customSubjectName: null,
+              currentContext: `${context.prefix} preparing for seminar`,
+              goal: `${context.prefix} solve weekly tasks`,
+              desiredFrequency: "WEEKLY",
+              preferredTime: "EVENING",
+              preferredFormat: "ONLINE"
+            }
+          }
+        ),
+      /Выберите предмет|subjectId/
     );
   } finally {
     await cleanupContext(context);

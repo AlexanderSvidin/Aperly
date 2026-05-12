@@ -1,16 +1,23 @@
 import { redirect } from "next/navigation";
 
 import { ProfileScreenShell } from "@/features/profile/components/profile-screen-shell";
+import type { SerializedRequest } from "@/features/requests/lib/request-schema";
 import { requirePageUser } from "@/server/services/auth/current-user";
 import { profileService } from "@/server/services/profile/profile-service";
+import { requestService } from "@/server/services/requests/request-service";
 
 export default async function ProfilePage() {
   const user = await requirePageUser();
 
   let editorData;
+  let archivedRequests: SerializedRequest[] = [];
 
   try {
     editorData = await profileService.getEditorData(user.id);
+    const requests = await requestService.listForUser(user.id);
+    archivedRequests = requests.filter((request) =>
+      ["CLOSED", "DELETED", "EXPIRED"].includes(request.status)
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Неизвестная ошибка";
@@ -28,6 +35,8 @@ export default async function ProfilePage() {
   return (
     <ProfileScreenShell
       initialValues={editorData.initialValues}
+      archivedRequests={archivedRequests}
+      key={user.id}
       lookups={editorData.lookups}
       mode="edit"
       viewer={editorData.viewer}

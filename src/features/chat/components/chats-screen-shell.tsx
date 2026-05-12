@@ -36,6 +36,8 @@ import type {
   SerializedMessage,
   SentMessageResult
 } from "@/features/chat/lib/chat-types";
+import type { ActionState } from "@/lib/ui/action-state";
+import { idleActionState, isActionLoading } from "@/lib/ui/action-state";
 
 type ChatsScreenShellProps = {
   initialData: SerializedChatScreenData;
@@ -189,6 +191,9 @@ export function ChatsScreenShell({
   const router = useRouter();
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [actionStates, setActionStates] = useState<Record<string, ActionState>>(
+    {}
+  );
   const [composerText, setComposerText] = useState("");
   const [chatList, setChatList] = useState(initialData.chats);
   const [pendingInvites, setPendingInvites] = useState(initialData.pendingInvites);
@@ -209,6 +214,21 @@ export function ChatsScreenShell({
     selectedChat?.status !== "BLOCKED" && selectedChat?.status !== "CLOSED";
   const selectedStudyPanel = selectedChat?.studySessionPanel ?? null;
   const selectedStudySession = selectedStudyPanel?.latestSession ?? null;
+
+  function getActionState(actionKey: string) {
+    return actionStates[actionKey] ?? idleActionState;
+  }
+
+  function setActionStatus(actionKey: string, state: ActionState) {
+    setActionStates((currentStates) => ({
+      ...currentStates,
+      [actionKey]: state
+    }));
+  }
+
+  function isActionBusy(actionKey: string) {
+    return isActionLoading(getActionState(actionKey));
+  }
 
   async function refreshSelectedChatMetadata() {
     if (!selectedChatId) {
@@ -370,8 +390,21 @@ export function ChatsScreenShell({
     matchId: string,
     decision: "ACCEPT" | "DECLINE"
   ) {
+    const actionKey = `invite:${decision.toLowerCase()}:${matchId}`;
+
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
     startTransition(async () => {
       setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message:
+          decision === "ACCEPT"
+            ? "Принимаем отклик..."
+            : "Отклоняем отклик..."
+      });
 
       const response = await fetch(`/api/matches/${matchId}/respond`, {
         method: "POST",
@@ -388,17 +421,26 @@ export function ChatsScreenShell({
         | null;
 
       if (!response.ok || !payload || !("status" in payload)) {
+        const message = extractErrorMessage(
+          payload,
+          "Не удалось ответить на отклик."
+        );
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
         setFeedback({
           kind: "error",
-          message: extractErrorMessage(
-            payload,
-            "Не удалось ответить на приглашение."
-          )
+          message
         });
         return;
       }
 
       if (payload.status === "ACCEPTED") {
+        setActionStatus(actionKey, {
+          status: "success",
+          message: "Отклик принят."
+        });
         router.push(buildChatsHref(payload.chatId));
         router.refresh();
         return;
@@ -407,9 +449,13 @@ export function ChatsScreenShell({
       setPendingInvites((currentInvites) =>
         currentInvites.filter((invite) => invite.matchId !== matchId)
       );
+      setActionStatus(actionKey, {
+        status: "success",
+        message: "Отклик отклонён."
+      });
       setFeedback({
         kind: "success",
-        message: "Приглашение отклонено."
+        message: "Отклик отклонён."
       });
       router.refresh();
     });
@@ -476,8 +522,18 @@ export function ChatsScreenShell({
       return;
     }
 
+    const actionKey = `contact-request:${selectedChatId}`;
+
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
     startTransition(async () => {
       setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message: "Запрашиваем контакты..."
+      });
 
       const response = await fetch(
         `/api/chats/${selectedChatId}/contact-exchange/request`,
@@ -496,12 +552,17 @@ export function ChatsScreenShell({
         !payload ||
         !("contactExchangeStatus" in payload)
       ) {
+        const message = extractErrorMessage(
+          payload,
+          "Не удалось запросить контакт."
+        );
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
         setFeedback({
           kind: "error",
-          message: extractErrorMessage(
-            payload,
-            "Не удалось запросить обмен контактами."
-          )
+          message
         });
         return;
       }
@@ -514,9 +575,13 @@ export function ChatsScreenShell({
         });
       }
 
+      setActionStatus(actionKey, {
+        status: "success",
+        message: "Запрос контакта отправлен."
+      });
       setFeedback({
         kind: "success",
-        message: "Запрос на обмен контактами отправлен."
+        message: "Запрос контакта отправлен."
       });
       router.refresh();
     });
@@ -527,8 +592,21 @@ export function ChatsScreenShell({
       return;
     }
 
+    const actionKey = `contact-respond:${decision.toLowerCase()}:${selectedChatId}`;
+
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
     startTransition(async () => {
       setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message:
+          decision === "ACCEPT"
+            ? "Открываем контакты..."
+            : "Отклоняем обмен..."
+      });
 
       const response = await fetch(
         `/api/chats/${selectedChatId}/contact-exchange/respond`,
@@ -547,12 +625,17 @@ export function ChatsScreenShell({
         | null;
 
       if (!response.ok || !payload || !("status" in payload)) {
+        const message = extractErrorMessage(
+          payload,
+          "Не удалось ответить на запрос контакта."
+        );
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
         setFeedback({
           kind: "error",
-          message: extractErrorMessage(
-            payload,
-            "Не удалось ответить на обмен контактами."
-          )
+          message
         });
         return;
       }
@@ -569,12 +652,19 @@ export function ChatsScreenShell({
         });
       }
 
+      setActionStatus(actionKey, {
+        status: "success",
+        message:
+          payload.status === "MUTUAL_CONSENT_REACHED"
+            ? "Контакты открыты для обеих сторон."
+            : "Запрос контакта отклонён."
+      });
       setFeedback({
         kind: "success",
         message:
           payload.status === "MUTUAL_CONSENT_REACHED"
             ? "Контакты открыты для обеих сторон."
-            : "Запрос на обмен контактами отклонён."
+            : "Запрос контакта отклонён."
       });
       router.refresh();
     });
@@ -776,12 +866,11 @@ export function ChatsScreenShell({
     <div className="screen-stack">
       <section className="surface-card screen-stack">
         <div className="screen-copy">
-          <p className="card-eyebrow">Диалоги</p>
-          <h2 className="screen-title">Чаты и приглашения</h2>
+          <p className="card-eyebrow">Контакты</p>
+          <h2 className="screen-title">Принятые отклики</h2>
           <p className="screen-description">
-            Разговоры после мэтча помогают принять решение: можно принять приглашение
-            из резервного подбора, написать первое сообщение, напомнить о себе и открыть
-            контакты только по взаимному согласию.
+            Вспомогательный раздел для старых связей. Основной шаг теперь:
+            отклик, принятие и переход в Telegram.
           </p>
         </div>
 
@@ -800,8 +889,8 @@ export function ChatsScreenShell({
         {chatList.length === 0 && pendingInvites.length === 0 ? (
           <div className="screen-stack">
             <p className="screen-description">
-              Откройте мэтчи и начните разговор с подходящим человеком.
-              Первый чат станет центром решения: роли, время, контакты.
+              Откройте отклики и выберите подходящего человека. После принятия
+              появится контакт для Telegram.
             </p>
             <Link
               className={buttonClassName({
@@ -809,7 +898,7 @@ export function ChatsScreenShell({
               })}
               href="/matches"
             >
-              Перейти к мэтчам
+              Перейти к откликам
             </Link>
           </div>
         ) : null}
@@ -819,9 +908,10 @@ export function ChatsScreenShell({
         <section className="surface-card screen-stack">
           <div className="screen-copy">
             <p className="card-eyebrow">Нужно решение</p>
-            <h2 className="card-title">Входящие приглашения</h2>
+            <h2 className="card-title">Входящие отклики</h2>
             <p className="card-body-copy">
-              Это резервный подбор по открытому профилю: сначала вы решаете, готовы ли открыть чат.
+              Это резервный подбор по открытому профилю: сначала вы решаете,
+              готовы ли принять отклик.
             </p>
           </div>
 
@@ -833,21 +923,33 @@ export function ChatsScreenShell({
                     <span className="status-pill">
                       {chatScenarioLabels[invite.scenario]}
                     </span>
-                    <span className="score-pill">{invite.score}/100</span>
+                    <span className="tone-pill" data-tone="warning">
+                      Можно откликнуться
+                    </span>
                   </div>
                   <h3 className="card-title">{invite.initiatorDisplayName}</h3>
-                  <p className="card-body-copy">{invite.reasonSummary}</p>
+                  <p className="card-body-copy">Почему подходит: {invite.reasonSummary}</p>
                 </div>
 
                 <div className="card-actions-row card-actions-row-inline">
                   <Button
-                    disabled={isPending}
+                    disabled={
+                      isPending ||
+                      isActionBusy(`invite:decline:${invite.matchId}`)
+                    }
+                    isLoading={isActionBusy(`invite:accept:${invite.matchId}`)}
+                    loadingLabel="Принимаем..."
                     onClick={() => handleRespondInvite(invite.matchId, "ACCEPT")}
                   >
                     Принять
                   </Button>
                   <Button
-                    disabled={isPending}
+                    disabled={
+                      isPending ||
+                      isActionBusy(`invite:accept:${invite.matchId}`)
+                    }
+                    isLoading={isActionBusy(`invite:decline:${invite.matchId}`)}
+                    loadingLabel="Отклоняем..."
                     onClick={() => handleRespondInvite(invite.matchId, "DECLINE")}
                     variant="ghost"
                   >
@@ -864,8 +966,8 @@ export function ChatsScreenShell({
         <div className="chat-layout">
           <section className="surface-card screen-stack">
             <div className="screen-copy">
-              <p className="card-eyebrow">Активные чаты</p>
-              <h2 className="card-title">Продолжить разговор</h2>
+              <p className="card-eyebrow">Принятые связи</p>
+              <h2 className="card-title">Контакты</h2>
             </div>
 
             <div className="chat-list">
@@ -976,6 +1078,10 @@ export function ChatsScreenShell({
                     <div className="card-actions-row card-actions-row-inline">
                       <Button
                         disabled={isPending || !isThreadWritable}
+                        isLoading={isActionBusy(
+                          `contact-request:${selectedChat.id}`
+                        )}
+                        loadingLabel="Запрашиваем..."
                         onClick={handleRequestContacts}
                       >
                         Запросить контакты
@@ -986,7 +1092,7 @@ export function ChatsScreenShell({
                   {selectedChat.contactExchangeStatus ===
                     "REQUESTED_ONE_SIDED" && selectedChat.contactExchangeRequestedByMe ? (
                     <p className="helper-text">
-                      Вы уже запросили обмен контактами. Ждём ответ собеседника.
+                      Запрос отправлен. Ждём ответ.
                     </p>
                   ) : null}
 
@@ -994,13 +1100,27 @@ export function ChatsScreenShell({
                     "REQUESTED_ONE_SIDED" && !selectedChat.contactExchangeRequestedByMe ? (
                     <div className="card-actions-row card-actions-row-inline">
                       <Button
-                        disabled={isPending}
+                        disabled={
+                          isPending ||
+                          isActionBusy(`contact-respond:decline:${selectedChat.id}`)
+                        }
+                        isLoading={isActionBusy(
+                          `contact-respond:accept:${selectedChat.id}`
+                        )}
+                        loadingLabel="Открываем..."
                         onClick={() => handleRespondToContactExchange("ACCEPT")}
                       >
                         Открыть контакты
                       </Button>
                       <Button
-                        disabled={isPending}
+                        disabled={
+                          isPending ||
+                          isActionBusy(`contact-respond:accept:${selectedChat.id}`)
+                        }
+                        isLoading={isActionBusy(
+                          `contact-respond:decline:${selectedChat.id}`
+                        )}
+                        loadingLabel="Отказываем..."
                         onClick={() => handleRespondToContactExchange("DECLINE")}
                         variant="ghost"
                       >
@@ -1011,8 +1131,7 @@ export function ChatsScreenShell({
 
                   {selectedChat.contactExchangeStatus === "DECLINED" ? (
                     <p className="helper-text">
-                      Контакты не были открыты, но диалог остаётся доступным
-                      внутри приложения.
+                      Контакт недоступен. Можно вернуться к другим откликам.
                     </p>
                   ) : null}
                 </div>
@@ -1026,8 +1145,8 @@ export function ChatsScreenShell({
                       </h3>
                       <p className="card-body-copy">
                         Сценарий совместной учёбы с{" "}
-                        {selectedStudyPanel.partnerName}. Встречи фиксируются в чате,
-                        чтобы после чата был понятный следующий шаг.
+                        {selectedStudyPanel.partnerName}. Встречи фиксируются здесь,
+                        чтобы следующий шаг был понятен.
                       </p>
                     </div>
 
@@ -1075,7 +1194,7 @@ export function ChatsScreenShell({
                     ) : (
                       <p className="helper-text">
                         Встреча ещё не назначена. Предложите время после первого
-                        короткого обсуждения в чате.
+                        короткого согласования.
                       </p>
                     )}
 
@@ -1313,7 +1432,7 @@ export function ChatsScreenShell({
                     </Button>
                     {!isThreadWritable ? (
                       <p className="helper-text">
-                        В этот чат сейчас нельзя писать.
+                        Здесь сейчас нельзя писать.
                       </p>
                     ) : null}
                   </div>
@@ -1322,8 +1441,7 @@ export function ChatsScreenShell({
             ) : (
               <div className="chat-empty-state">
                 <p className="screen-description">
-                  Выберите чат слева, чтобы увидеть историю и продолжить
-                  разговор.
+                  Выберите связь слева, чтобы увидеть историю.
                 </p>
               </div>
             )}

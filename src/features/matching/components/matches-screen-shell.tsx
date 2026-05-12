@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import Link from "next/link";
 import type { Route } from "next";
@@ -8,15 +8,14 @@ import { useRouter } from "next/navigation";
 
 import { buttonClassName, Button } from "@/components/ui/button";
 import {
-  chatReadinessLabels,
+  getMatchUiStatus,
   matchModeLabels,
-  matchStatusLabels,
-  matchStatusTone,
   scenarioLabelByValue
 } from "@/features/matching/lib/match-options";
 import type {
   SerializedMatchListItem,
-  SerializedMatchesScreenData
+  SerializedMatchesScreenData,
+  SerializedRequestMatches
 } from "@/features/matching/lib/match-types";
 import { formatOptions } from "@/features/profile/lib/profile-options";
 import {
@@ -24,8 +23,11 @@ import {
   requestStatusLabels,
   requestStatusTone
 } from "@/features/requests/lib/request-options";
+import type { ActionState } from "@/lib/ui/action-state";
+import { idleActionState, isActionLoading } from "@/lib/ui/action-state";
 
 type MatchesScreenShellProps = {
+  creationNotice?: boolean;
   initialData: SerializedMatchesScreenData;
 };
 
@@ -37,6 +39,7 @@ type FeedbackState = {
 const formatLabelByValue = Object.fromEntries(
   formatOptions.map((option) => [option.value, option.label])
 ) as Record<(typeof formatOptions)[number]["value"], string>;
+const INTRO_MESSAGE_MAX_LENGTH = 500;
 
 function buildMatchesHref(
   requestId?: string | null,
@@ -55,18 +58,6 @@ function buildMatchesHref(
   const queryString = searchParams.toString();
 
   return (queryString ? `/matches?${queryString}` : "/matches") as Route;
-}
-
-function buildChatsHref(chatId?: string | null): Route {
-  const searchParams = new URLSearchParams();
-
-  if (chatId) {
-    searchParams.set("chatId", chatId);
-  }
-
-  const queryString = searchParams.toString();
-
-  return (queryString ? `/chats?${queryString}` : "/chats") as Route;
 }
 
 function formatProfileMeta(match: SerializedMatchListItem) {
@@ -88,27 +79,78 @@ function renderInfoChips(values: string[], limit: number) {
   ));
 }
 
-export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
+export function MatchesScreenShell({
+  creationNotice = false,
+  initialData
+}: MatchesScreenShellProps) {
   const router = useRouter();
+  const [refreshedCollection, setRefreshedCollection] =
+    useState<SerializedRequestMatches | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [introMessage, setIntroMessage] = useState("");
+  const [actionStates, setActionStates] = useState<Record<string, ActionState>>(
+    {}
+  );
 
-  const selectedRequest = initialData.requests.find(
+  const requests =
+    refreshedCollection && refreshedCollection.requestId === initialData.selectedRequestId
+      ? initialData.requests.map((request) =>
+          request.id === refreshedCollection.requestId
+            ? {
+                ...request,
+                activeMatchCount: refreshedCollection.matches.length,
+                fallbackUsed: refreshedCollection.fallbackUsed,
+                lastMatchedAt: refreshedCollection.lastMatchedAt
+              }
+            : request
+        )
+      : initialData.requests;
+  const selectedCollection =
+    refreshedCollection &&
+    refreshedCollection.requestId === initialData.selectedRequestMatches?.requestId
+      ? refreshedCollection
+      : initialData.selectedRequestMatches;
+
+  const selectedRequest = requests.find(
     (request) => request.id === initialData.selectedRequestId
   );
-  const selectedCollection = initialData.selectedRequestMatches;
   const selectedMatch =
     selectedCollection?.matches.find(
       (match) => match.id === initialData.selectedMatchId
     ) ?? null;
+
+  function getActionState(actionKey: string) {
+    return actionStates[actionKey] ?? idleActionState;
+  }
+
+  function setActionStatus(actionKey: string, state: ActionState) {
+    setActionStates((currentStates) => ({
+      ...currentStates,
+      [actionKey]: state
+    }));
+  }
+
+  function isActionBusy(actionKey: string) {
+    return isActionLoading(getActionState(actionKey));
+  }
 
   function handleRefresh() {
     if (!selectedCollection || selectedCollection.requestStatus !== "ACTIVE") {
       return;
     }
 
-    startTransition(async () => {
+    const actionKey = `refresh:${selectedCollection.requestId}`;
+
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
+    void (async () => {
       setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message: "Обновляем подборку..."
+      });
 
       const response = await fetch(
         `/api/requests/${selectedCollection.requestId}/matches/refresh`,
@@ -121,27 +163,49 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
         | {
             message?: string;
             matchCount?: number;
+            newMatchCount?: number;
+            collection?: SerializedMatchesScreenData["selectedRequestMatches"];
           }
         | null;
 
       if (!response.ok) {
+        const message =
+          result?.message ?? "Не удалось обновить, попробуйте ещё раз.";
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
         setFeedback({
           kind: "error",
-          message: result?.message ?? "Не удалось обновить подбор."
+          message
         });
         return;
       }
 
+      const message =
+        typeof result?.newMatchCount === "number" && result.newMatchCount > 0
+          ? `Найдено ${result.newMatchCount} новых совпадений.`
+          : typeof result?.matchCount === "number" && result.matchCount > 0
+            ? "Подборка обновлена."
+            : "Пока новых совпадений нет.";
+
+      const refreshedCollection = result?.collection;
+
+      if (refreshedCollection) {
+        setRefreshedCollection(refreshedCollection);
+      }
+
+      setActionStatus(actionKey, {
+        status: "success",
+        message
+      });
       setFeedback({
         kind: "success",
-        message:
-          typeof result?.matchCount === "number"
-            ? `Подбор обновлён: ${result.matchCount} совпадений.`
-            : "Подбор обновлён."
+        message
       });
 
       router.refresh();
-    });
+    })();
   }
 
   function handleOpenChat() {
@@ -149,56 +213,166 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
       return;
     }
 
-    startTransition(async () => {
+    const text = introMessage.trim();
+
+    if (text.length < 10) {
+      setFeedback({
+        kind: "error",
+        message: "Коротко напишите, почему хотите присоединиться."
+      });
+      return;
+    }
+
+    const actionKey = `match:${selectedMatch.id}`;
+
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
+    void (async () => {
       setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message: "Готовим следующий шаг..."
+      });
 
       const response = await fetch(`/api/matches/${selectedMatch.id}/open-chat`, {
-        method: "POST"
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ introMessage: text })
       });
 
       const result = (await response.json().catch(() => null)) as
         | {
-            status?: "CHAT_READY" | "INVITE_SENT";
+            status?: "CHAT_READY" | "INVITE_SENT" | "RESPONSE_SENT";
             chatId?: string;
             message?: string;
           }
         | null;
 
       if (!response.ok || !result?.status) {
+        const message =
+          result?.message ?? "Не удалось перейти к следующему шагу по совпадению.";
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
         setFeedback({
           kind: "error",
-          message:
-            result?.message ?? "Не удалось перейти к следующему шагу по мэтчу."
+          message
         });
         return;
       }
 
       if (result.status === "CHAT_READY" && result.chatId) {
-        router.push(buildChatsHref(result.chatId));
+        setActionStatus(actionKey, {
+          status: "success",
+          message: "Связь уже открыта."
+        });
         router.refresh();
         return;
       }
 
+      setActionStatus(actionKey, {
+        status: "success",
+        message: "Отклик отправлен. Автор запроса сможет ответить."
+      });
       setFeedback({
         kind: "success",
-        message:
-          "Приглашение отправлено. Чат откроется, когда вторая сторона его примет."
+        message: "Отклик отправлен. Автор запроса сможет ответить."
+      });
+      setIntroMessage("");
+      router.refresh();
+    })();
+  }
+
+  function handleRespondToResponse(decision: "ACCEPT" | "DECLINE") {
+    if (!selectedMatch) {
+      return;
+    }
+
+    const actionKey = `response:${decision.toLowerCase()}:${selectedMatch.id}`;
+
+    if (isActionBusy(actionKey)) {
+      return;
+    }
+
+    void (async () => {
+      setFeedback(null);
+      setActionStatus(actionKey, {
+        status: "loading",
+        message: decision === "ACCEPT" ? "Принимаем отклик..." : "Отклоняем отклик..."
+      });
+
+      const response = await fetch(`/api/matches/${selectedMatch.id}/respond`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ decision })
+      });
+      const result = (await response.json().catch(() => null)) as
+        | {
+            status?: "ACCEPTED" | "DECLINED";
+            telegramUrl?: string | null;
+            contactHint?: string;
+            message?: string;
+          }
+        | null;
+
+      if (!response.ok || !result?.status) {
+        const message = result?.message ?? "Не удалось ответить на отклик.";
+        setActionStatus(actionKey, {
+          status: "error",
+          message
+        });
+        setFeedback({
+          kind: "error",
+          message
+        });
+        return;
+      }
+
+      const message =
+        result.status === "ACCEPTED"
+          ? result.telegramUrl
+            ? "Отклик принят. Теперь можно написать в Telegram."
+            : (result.contactHint ?? "Отклик принят, но контакт недоступен.")
+          : "Отклик отклонён.";
+
+      setActionStatus(actionKey, {
+        status: "success",
+        message
+      });
+      setFeedback({
+        kind: "success",
+        message
       });
       router.refresh();
-    });
+    })();
   }
 
   return (
     <div className="screen-stack">
       <section className="surface-card screen-stack">
         <div className="screen-copy">
-          <p className="card-eyebrow">Подбор</p>
-          <h2 className="screen-title">Матчи по активным запросам</h2>
+          <p className="card-eyebrow">Отклики</p>
+          <h2 className="screen-title">Подходящие люди по вашим запросам</h2>
           <p className="screen-description">
-            Aperly сравнивает ваши запросы с запросами других студентов, а при
-            малом пуле показывает подходящие открытые профили.
+            Выберите свой запрос и посмотрите, кто подходит, кто ждёт ответа и
+            какой следующий шаг доступен.
           </p>
         </div>
+
+        {creationNotice ? (
+          <div className="feedback-box success-box">
+            <p className="feedback-title">
+              Запрос опубликован. Теперь люди смогут откликнуться.
+            </p>
+          </div>
+        ) : null}
 
         {feedback ? (
           <div
@@ -212,11 +386,11 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
           </div>
         ) : null}
 
-        {initialData.requests.length === 0 ? (
+        {requests.length === 0 ? (
           <div className="screen-stack">
             <p className="screen-description">
-              Создайте короткий запрос, чтобы получить первые рекомендации
-              под конкретную цель.
+              Создайте короткий запрос, чтобы получать отклики и подходящих
+              людей под конкретную цель.
             </p>
             <Link
               className={buttonClassName({
@@ -229,7 +403,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
           </div>
         ) : (
           <div className="request-selector-grid">
-            {initialData.requests.map((request) => (
+            {requests.map((request) => (
               <Link
                 key={request.id}
                 className="request-selector-card"
@@ -252,7 +426,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                       {requestStatusLabels[request.status]}
                     </span>
                     <span className="score-pill">
-                      {request.activeMatchCount} мэтч.
+                      {request.activeMatchCount} совп.
                     </span>
                   </div>
                 </div>
@@ -294,13 +468,16 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
             <div className="card-actions-row">
               <Button
                 disabled={
-                  isPending || selectedCollection.requestStatus !== "ACTIVE"
+                  isActionBusy(`refresh:${selectedCollection.requestId}`) ||
+                  selectedCollection.requestStatus !== "ACTIVE"
                 }
                 fullWidth
+                isLoading={isActionBusy(`refresh:${selectedCollection.requestId}`)}
+                loadingLabel="Обновляем..."
                 onClick={handleRefresh}
                 variant="secondary"
               >
-                {isPending ? "Обновляем..." : "Обновить подбор"}
+                Обновить подборку
               </Button>
               <Link
                 className={buttonClassName({
@@ -335,7 +512,9 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
               <div className="card-actions-row card-actions-row-inline">
                 {selectedCollection.requestStatus === "ACTIVE" ? (
                   <Button
-                    disabled={isPending}
+                    disabled={isActionBusy(`refresh:${selectedCollection.requestId}`)}
+                    isLoading={isActionBusy(`refresh:${selectedCollection.requestId}`)}
+                    loadingLabel="Ищем..."
                     onClick={handleRefresh}
                     variant="secondary"
                   >
@@ -356,25 +535,30 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
             <div className="match-list">
               {selectedCollection.matches.map((match) => {
                 const isSelected = match.id === initialData.selectedMatchId;
+                const uiStatus = getMatchUiStatus(match);
 
                 return (
                   <article key={match.id} className="match-card">
                     <div className="match-card-head">
                       <div className="screen-copy">
                         <div className="match-badge-row">
-                          <span className="score-pill">{match.score}/100</span>
                           <span
                             className="tone-pill"
-                            data-tone={matchStatusTone[match.status]}
+                            data-tone={uiStatus.tone}
                           >
-                            {matchStatusLabels[match.status]}
+                            {uiStatus.label}
                           </span>
                           <span className="status-pill">
                             {matchModeLabels[match.mode]}
                           </span>
                         </div>
                         <h3 className="card-title">{match.candidateProfile.fullName}</h3>
-                        <p className="card-body-copy">{match.reasonSummary}</p>
+                        <p className="card-body-copy">Почему подходит</p>
+                        <div className="chip-row">
+                          {match.reasons.length > 0
+                            ? renderInfoChips(match.reasons, 4)
+                            : renderInfoChips([match.reasonSummary], 1)}
+                        </div>
                       </div>
 
                       <Link
@@ -428,9 +612,7 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
                             .join(" • ")}
                         </p>
                       ) : null}
-                      <p className="helper-text">
-                        {chatReadinessLabels[match.chatReadiness]}
-                      </p>
+                      <p className="helper-text">{uiStatus.nextAction}</p>
                     </div>
                   </article>
                 );
@@ -443,47 +625,127 @@ export function MatchesScreenShell({ initialData }: MatchesScreenShellProps) {
       {selectedMatch && selectedCollection ? (
         <section className="surface-card screen-stack">
           <div className="screen-copy">
-            <p className="card-eyebrow">Детали мэтча</p>
+            <p className="card-eyebrow">Детали совпадения</p>
             <h2 className="screen-title">{selectedMatch.candidateProfile.fullName}</h2>
-            <p className="screen-description">{selectedMatch.reasonSummary}</p>
+            <p className="screen-description">Почему подходит</p>
           </div>
 
-          {selectedMatch.dimensions.length > 0 ? (
-            <div className="match-dimension-list">
-              {selectedMatch.dimensions.map((dimension) => (
-                <div key={dimension.key} className="match-dimension-row">
-                  <span>{dimension.label}</span>
-                  <strong>{dimension.score}</strong>
-                </div>
-              ))}
+          <div className="match-dimension-list">
+            <div className="chip-row">
+              {selectedMatch.reasons.length > 0
+                ? renderInfoChips(selectedMatch.reasons, 4)
+                : renderInfoChips([selectedMatch.reasonSummary], 1)}
             </div>
-          ) : (
-            <p className="helper-text">
-              Детализация появится после следующего пересчёта. Откройте
-              профиль кандидата или обновите подбор.
-            </p>
-          )}
+            {selectedMatch.dimensions.length > 0 ? (
+              <p className="helper-text">
+                Детали подбора вторичны: важнее конкретные причины выше.
+              </p>
+            ) : null}
+          </div>
 
           <div className="match-context-card">
             <p className="card-eyebrow">Следующий шаг</p>
             <p className="feedback-title">
-              {chatReadinessLabels[selectedMatch.chatReadiness]}
+              {getMatchUiStatus(selectedMatch).label}
             </p>
-            <p className="card-body-copy">
-              Контакты скрыты. Сначала откройте чат и договоритесь о
-              сотрудничестве, затем обменяйтесь контактами по взаимному согласию.
-            </p>
+            {selectedMatch.response.introMessage ? (
+              <div className="quick-goal-preview">
+                <span className="accent-icon-badge" aria-hidden="true">
+                  TG
+                </span>
+                <div className="special-card-copy">
+                  <strong>
+                    {selectedMatch.response.sentByMe
+                      ? "Ваш отклик"
+                      : "Отклик участника"}
+                  </strong>
+                  <p className="helper-text">{selectedMatch.response.introMessage}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="card-body-copy">
+                Напишите коротко, кто вы, почему подходите и что предлагаете
+                сделать дальше.
+              </p>
+            )}
+
+            {selectedMatch.response.canSendIntro ? (
+              <label className="field-stack">
+                <span className="field-label">Отклик</span>
+                <textarea
+                  className="field-textarea"
+                  maxLength={INTRO_MESSAGE_MAX_LENGTH}
+                  onChange={(event) => setIntroMessage(event.target.value)}
+                  placeholder="Коротко напишите, почему хотите присоединиться"
+                  rows={4}
+                  value={introMessage}
+                />
+                <span className="helper-text">
+                  {introMessage.trim().length}/{INTRO_MESSAGE_MAX_LENGTH}
+                </span>
+              </label>
+            ) : null}
+
+            {selectedMatch.response.status === "ACCEPTED" ? (
+              <p className="card-body-copy">{selectedMatch.response.contactHint}</p>
+            ) : null}
           </div>
 
           <div className="card-actions-row card-actions-row-inline">
-            <Button
-              disabled={isPending}
-              onClick={handleOpenChat}
-            >
-              {selectedMatch.chatReadiness === "READY_FOR_CHAT"
-                ? "Перейти в чат"
-                : "Отправить приглашение"}
-            </Button>
+            {selectedMatch.response.status === "ACCEPTED" &&
+            selectedMatch.response.telegramUrl ? (
+              <a
+                className={buttonClassName()}
+                href={selectedMatch.response.telegramUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Написать в Telegram
+              </a>
+            ) : null}
+
+            {selectedMatch.response.canAccept ? (
+              <>
+                <Button
+                  disabled={
+                    isActionBusy(`response:accept:${selectedMatch.id}`) ||
+                    isActionBusy(`response:decline:${selectedMatch.id}`)
+                  }
+                  isLoading={isActionBusy(`response:accept:${selectedMatch.id}`)}
+                  loadingLabel="Принимаем..."
+                  onClick={() => handleRespondToResponse("ACCEPT")}
+                >
+                  Принять отклик
+                </Button>
+                <Button
+                  disabled={
+                    isActionBusy(`response:accept:${selectedMatch.id}`) ||
+                    isActionBusy(`response:decline:${selectedMatch.id}`)
+                  }
+                  isLoading={isActionBusy(`response:decline:${selectedMatch.id}`)}
+                  loadingLabel="Отклоняем..."
+                  onClick={() => handleRespondToResponse("DECLINE")}
+                  variant="ghost"
+                >
+                  Отклонить
+                </Button>
+              </>
+            ) : null}
+
+            {selectedMatch.response.canSendIntro ? (
+              <Button
+                disabled={
+                  !getMatchUiStatus(selectedMatch).canAct ||
+                  introMessage.trim().length < 10 ||
+                  isActionBusy(`match:${selectedMatch.id}`)
+                }
+                isLoading={isActionBusy(`match:${selectedMatch.id}`)}
+                loadingLabel="Отправляем..."
+                onClick={handleOpenChat}
+              >
+                Откликнуться
+              </Button>
+            ) : null}
             <Link
               className={buttonClassName({
                 variant: "secondary"

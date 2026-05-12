@@ -19,6 +19,7 @@ export default async function ChatsPage({ searchParams }: ChatsPageProps) {
     chatId: readSingleSearchParam(resolvedSearchParams?.chatId)
   });
   const screenKey = [
+    user.id,
     initialData.selectedChatId ?? "no-chat",
     initialData.chats.length,
     initialData.pendingInvites.length,

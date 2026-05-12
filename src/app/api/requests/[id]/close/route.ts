@@ -6,26 +6,27 @@ import {
   requireApiUserFromRequest
 } from "@/server/services/auth/api-user-guard";
 import {
-  MatchingDomainError,
-  matchingService
-} from "@/server/services/matching/matching-service";
+  RequestDomainError,
+  requestService
+} from "@/server/services/requests/request-service";
 
-type MatchRouteProps = {
+type RequestRouteProps = {
   params: Promise<{
     id: string;
   }>;
 };
 
-function buildMatchingErrorResponse(error: unknown) {
+function buildRequestErrorResponse(error: unknown) {
   if (error instanceof ApiUserAccessError) {
     return buildApiUserAccessErrorResponse(error);
   }
 
-  if (error instanceof MatchingDomainError) {
+  if (error instanceof RequestDomainError) {
     return NextResponse.json(
       {
         code: error.code,
-        message: error.message
+        message: error.message,
+        meta: error.meta
       },
       {
         status: error.status
@@ -35,7 +36,7 @@ function buildMatchingErrorResponse(error: unknown) {
 
   return NextResponse.json(
     {
-      message: "Не удалось загрузить карточку отклика."
+      message: "Не удалось закрыть запрос."
     },
     {
       status: 500
@@ -43,16 +44,23 @@ function buildMatchingErrorResponse(error: unknown) {
   );
 }
 
-export async function GET(request: Request, { params }: MatchRouteProps) {
+export async function POST(request: Request, { params }: RequestRouteProps) {
   try {
     const user = await requireApiUserFromRequest(request);
     const resolvedParams = await params;
-    const match = await matchingService.getDetailForUser(user.id, resolvedParams.id);
+    const closedRequest = await requestService.close(
+      {
+        id: user.id,
+        status: user.status,
+        onboardingCompleted: user.onboardingCompleted
+      },
+      resolvedParams.id
+    );
 
     return NextResponse.json({
-      match
+      request: closedRequest
     });
   } catch (error) {
-    return buildMatchingErrorResponse(error);
+    return buildRequestErrorResponse(error);
   }
 }

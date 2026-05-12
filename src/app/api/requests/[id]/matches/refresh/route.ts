@@ -9,6 +9,7 @@ import {
   MatchingDomainError,
   matchingService
 } from "@/server/services/matching/matching-service";
+import { analyticsService } from "@/server/services/analytics/analytics-service";
 
 type RequestRouteProps = {
   params: Promise<{
@@ -44,9 +45,18 @@ function buildMatchingErrorResponse(error: unknown) {
 }
 
 export async function POST(request: Request, { params }: RequestRouteProps) {
+  let userId: string | null = null;
+  let requestId: string | null = null;
+
   try {
     const user = await requireApiUserFromRequest(request);
+    userId = user.id;
     const resolvedParams = await params;
+    requestId = resolvedParams.id;
+    await analyticsService.track("match_refresh_clicked", {
+      requestId,
+      userId
+    });
     const result = await matchingService.refreshForOwnedRequest(
       user.id,
       resolvedParams.id
@@ -54,6 +64,14 @@ export async function POST(request: Request, { params }: RequestRouteProps) {
 
     return NextResponse.json(result);
   } catch (error) {
+    if (userId && requestId) {
+      await analyticsService.track("match_refresh_completed", {
+        requestId,
+        userId,
+        success: false
+      });
+    }
+
     return buildMatchingErrorResponse(error);
   }
 }

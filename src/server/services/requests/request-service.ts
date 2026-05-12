@@ -17,6 +17,7 @@ import {
   loadStudySubjectLookups,
   resolveSubjectIdsWithCustomNames
 } from "@/server/services/study/study-subject-service";
+import { analyticsService } from "@/server/services/analytics/analytics-service";
 
 export type RequestActor = {
   id: string;
@@ -28,6 +29,20 @@ const availabilitySlotOrderBy: Prisma.AvailabilitySlotOrderByWithRelationInput[]
   { dayOfWeek: "asc" },
   { startMinute: "asc" }
 ];
+
+async function trackRequestActionCompleted(
+  action: "archive" | "close" | "create" | "pause" | "renew" | "update",
+  actorId: string,
+  request: Pick<SerializedRequest, "id" | "scenario" | "status">
+) {
+  await analyticsService.track("request_action_completed", {
+    action,
+    requestId: request.id,
+    scenario: request.scenario,
+    status: request.status,
+    userId: actorId
+  });
+}
 
 const requestInclude = {
   availabilitySlots: {
@@ -391,7 +406,9 @@ export interface RequestService {
   getById(ownerId: string, requestId: string): Promise<SerializedRequest>;
   create(actor: RequestActor, rawInput: unknown): Promise<SerializedRequest>;
   update(actor: RequestActor, requestId: string, rawInput: unknown): Promise<SerializedRequest>;
+  pause(actor: RequestActor, requestId: string): Promise<SerializedRequest>;
   renew(actor: RequestActor, requestId: string): Promise<SerializedRequest>;
+  close(actor: RequestActor, requestId: string): Promise<SerializedRequest>;
   archive(actor: RequestActor, requestId: string): Promise<SerializedRequest>;
 }
 
@@ -455,8 +472,10 @@ export const requestService: RequestService = {
     await matchingService.recomputeForRequest(created.id);
 
     const refreshedRequest = await loadOwnedRequest(actor.id, created.id);
+    const serialized = serializeRequest(refreshedRequest ?? created);
+    await trackRequestActionCompleted("create", actor.id, serialized);
 
-    return serializeRequest(refreshedRequest ?? created);
+    return serialized;
   },
 
   async update(actor, requestId, rawInput) {
@@ -516,8 +535,50 @@ export const requestService: RequestService = {
     await matchingService.recomputeForRequest(updated.id);
 
     const refreshedRequest = await loadOwnedRequest(actor.id, updated.id);
+    const serialized = serializeRequest(refreshedRequest ?? updated);
+    await trackRequestActionCompleted("update", actor.id, serialized);
 
-    return serializeRequest(refreshedRequest ?? updated);
+    return serialized;
+  },
+
+  async pause(actor, requestId) {
+    await assertRequestActorEligibility(actor);
+    await syncExpiredRequestsForUser(actor.id);
+
+    const existingRequest = await loadOwnedRequest(actor.id, requestId);
+
+    if (!existingRequest) {
+      throw new RequestDomainError({
+        code: "request_not_found",
+        message: "Р—Р°РїСЂРѕСЃ РЅРµ РЅР°Р№РґРµРЅ.",
+        status: 404
+      });
+    }
+
+    if (existingRequest.status !== "ACTIVE") {
+      throw new RequestDomainError({
+        code: "request_not_pausable",
+        message: "РџРѕСЃС‚Р°РІРёС‚СЊ РЅР° РїР°СѓР·Сѓ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ Р°РєС‚РёРІРЅС‹Р№ Р·Р°РїСЂРѕСЃ.",
+        status: 409
+      });
+    }
+
+    const paused = await prisma.request.update({
+      where: {
+        id: requestId
+      },
+      data: {
+        status: "EXPIRED"
+      },
+      include: requestInclude
+    });
+
+    await matchingService.recomputeForRequest(paused.id);
+
+    const serialized = serializeRequest(paused);
+    await trackRequestActionCompleted("pause", actor.id, serialized);
+
+    return serialized;
   },
 
   async renew(actor, requestId) {
@@ -534,13 +595,19 @@ export const requestService: RequestService = {
       });
     }
 
-    if (existingRequest.status !== "ACTIVE") {
-      await assertNoActiveScenarioDuplicate(
-        actor.id,
-        existingRequest.scenario,
-        existingRequest.id
-      );
+    if (existingRequest.status !== "EXPIRED") {
+      throw new RequestDomainError({
+        code: "request_not_resumable",
+        message: "Р’РѕР·РѕР±РЅРѕРІРёС‚СЊ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ Р·Р°РїСЂРѕСЃ РЅР° РїР°СѓР·Рµ.",
+        status: 409
+      });
     }
+
+    await assertNoActiveScenarioDuplicate(
+      actor.id,
+      existingRequest.scenario,
+      existingRequest.id
+    );
 
     const renewed = await prisma.request.update({
       where: {
@@ -557,8 +624,58 @@ export const requestService: RequestService = {
     await matchingService.recomputeForRequest(renewed.id);
 
     const refreshedRequest = await loadOwnedRequest(actor.id, renewed.id);
+    const serialized = serializeRequest(refreshedRequest ?? renewed);
+    await trackRequestActionCompleted("renew", actor.id, serialized);
 
-    return serializeRequest(refreshedRequest ?? renewed);
+    return serialized;
+  },
+
+  async close(actor, requestId) {
+    await assertRequestActorEligibility(actor);
+    await syncExpiredRequestsForUser(actor.id);
+
+    const existingRequest = await loadOwnedRequest(actor.id, requestId);
+
+    if (!existingRequest) {
+      throw new RequestDomainError({
+        code: "request_not_found",
+        message: "Р—Р°РїСЂРѕСЃ РЅРµ РЅР°Р№РґРµРЅ.",
+        status: 404
+      });
+    }
+
+    if (existingRequest.status === "CLOSED") {
+      const serialized = serializeRequest(existingRequest);
+      await trackRequestActionCompleted("close", actor.id, serialized);
+
+      return serialized;
+    }
+
+    if (existingRequest.status === "DELETED") {
+      throw new RequestDomainError({
+        code: "request_archived",
+        message: "РђСЂС…РёРІРЅС‹Р№ Р·Р°РїСЂРѕСЃ РЅРµР»СЊР·СЏ Р·Р°РєСЂС‹С‚СЊ.",
+        status: 409
+      });
+    }
+
+    const closed = await prisma.request.update({
+      where: {
+        id: requestId
+      },
+      data: {
+        status: "CLOSED",
+        closedAt: new Date()
+      },
+      include: requestInclude
+    });
+
+    await matchingService.recomputeForRequest(closed.id);
+
+    const serialized = serializeRequest(closed);
+    await trackRequestActionCompleted("close", actor.id, serialized);
+
+    return serialized;
   },
 
   async archive(actor, requestId) {
@@ -575,8 +692,11 @@ export const requestService: RequestService = {
       });
     }
 
-    if (existingRequest.status === "CLOSED") {
-      return serializeRequest(existingRequest);
+    if (existingRequest.status === "DELETED") {
+      const serialized = serializeRequest(existingRequest);
+      await trackRequestActionCompleted("archive", actor.id, serialized);
+
+      return serialized;
     }
 
     const archived = await prisma.request.update({
@@ -584,12 +704,17 @@ export const requestService: RequestService = {
         id: requestId
       },
       data: {
-        status: "CLOSED",
+        status: "DELETED",
         closedAt: new Date()
       },
       include: requestInclude
     });
 
-    return serializeRequest(archived);
+    await matchingService.recomputeForRequest(archived.id);
+
+    const serialized = serializeRequest(archived);
+    await trackRequestActionCompleted("archive", actor.id, serialized);
+
+    return serialized;
   }
 };

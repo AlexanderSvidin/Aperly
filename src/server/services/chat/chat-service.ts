@@ -23,6 +23,7 @@ import type {
 const STALE_THRESHOLD_MS = 72 * 60 * 60 * 1000;
 const CHAT_SOFT_LIMIT = 12;
 const MESSAGES_INITIAL_PAGE_SIZE = 50;
+const INTRO_MESSAGE_MAX_LENGTH = 500;
 
 // ---------------------------------------------------------------------------
 // Prisma includes
@@ -95,19 +96,45 @@ const matchForOpenChatInclude = {
     select: {
       id: true,
       ownerId: true,
-      scenario: true
+      scenario: true,
+      owner: {
+        select: {
+          profile: {
+            select: {
+              telegramUsername: true
+            }
+          },
+          username: true
+        }
+      }
     }
   },
   candidateRequest: {
     select: {
       id: true,
-      ownerId: true
+      ownerId: true,
+      owner: {
+        select: {
+          profile: {
+            select: {
+              telegramUsername: true
+            }
+          },
+          username: true
+        }
+      }
     }
   },
   candidateProfile: {
     select: {
       id: true,
-      userId: true
+      userId: true,
+      telegramUsername: true,
+      user: {
+        select: {
+          username: true
+        }
+      }
     }
   },
   chat: {
@@ -122,13 +149,45 @@ const matchForRespondInclude = {
     select: {
       id: true,
       ownerId: true,
-      scenario: true
+      scenario: true,
+      owner: {
+        select: {
+          profile: {
+            select: {
+              telegramUsername: true
+            }
+          },
+          username: true
+        }
+      }
+    }
+  },
+  candidateRequest: {
+    select: {
+      id: true,
+      ownerId: true,
+      owner: {
+        select: {
+          profile: {
+            select: {
+              telegramUsername: true
+            }
+          },
+          username: true
+        }
+      }
     }
   },
   candidateProfile: {
     select: {
       id: true,
-      userId: true
+      userId: true,
+      telegramUsername: true,
+      user: {
+        select: {
+          username: true
+        }
+      }
     }
   },
   chat: {
@@ -180,6 +239,106 @@ function computeContactExchangeStatus(
   raw: string
 ): ContactExchangeStatusValue {
   return raw as ContactExchangeStatusValue;
+}
+
+type StoredMatchResponse = {
+  status: "SENT" | "ACCEPTED" | "DECLINED";
+  introMessage: string;
+  sentByUserId: string;
+  sentAt: string;
+  decidedByUserId?: string | null;
+  decidedAt?: string | null;
+};
+
+function readReasonDetails(value: Prisma.JsonValue | null) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function readStoredResponse(value: Prisma.JsonValue | null): StoredMatchResponse | null {
+  const details = readReasonDetails(value) as { response?: unknown };
+  const response = details.response;
+
+  if (!response || typeof response !== "object" || Array.isArray(response)) {
+    return null;
+  }
+
+  const raw = response as Record<string, unknown>;
+
+  if (
+    (raw.status === "SENT" || raw.status === "ACCEPTED" || raw.status === "DECLINED") &&
+    typeof raw.introMessage === "string" &&
+    typeof raw.sentByUserId === "string" &&
+    typeof raw.sentAt === "string"
+  ) {
+    return {
+      status: raw.status,
+      introMessage: raw.introMessage,
+      sentByUserId: raw.sentByUserId,
+      sentAt: raw.sentAt,
+      decidedByUserId:
+        typeof raw.decidedByUserId === "string" ? raw.decidedByUserId : null,
+      decidedAt: typeof raw.decidedAt === "string" ? raw.decidedAt : null
+    };
+  }
+
+  return null;
+}
+
+function buildReasonDetailsWithResponse(
+  reasonDetails: Prisma.JsonValue | null,
+  response: StoredMatchResponse
+) {
+  return {
+    ...readReasonDetails(reasonDetails),
+    response
+  };
+}
+
+function normalizeIntroMessage(introMessage: string | null | undefined) {
+  const text = introMessage?.trim() ?? "";
+
+  if (text.length < 10) {
+    throw new ChatDomainError({
+      code: "intro_too_short",
+      message: "Коротко напишите, почему хотите присоединиться.",
+      status: 422
+    });
+  }
+
+  if (text.length > INTRO_MESSAGE_MAX_LENGTH) {
+    throw new ChatDomainError({
+      code: "intro_too_long",
+      message: `Отклик должен быть не длиннее ${INTRO_MESSAGE_MAX_LENGTH} символов.`,
+      status: 422
+    });
+  }
+
+  return text;
+}
+
+function normalizeTelegramUsername(value: string | null | undefined) {
+  const username = value?.trim().replace(/^@+/, "");
+
+  return username || null;
+}
+
+function buildTelegramUrl(value: string | null | undefined) {
+  const username = normalizeTelegramUsername(value);
+
+  return username ? `https://t.me/${username}` : null;
+}
+
+function buildAcceptedContactResult(telegramUsername: string | null | undefined) {
+  const normalized = normalizeTelegramUsername(telegramUsername);
+  const telegramUrl = buildTelegramUrl(normalized);
+
+  return {
+    telegramUsername: normalized,
+    telegramUrl,
+    contactHint: telegramUrl
+      ? "Теперь можно написать в Telegram."
+      : "Контакт недоступен: у человека нет открытого Telegram username."
+  };
 }
 
 function buildRevealedContacts(
@@ -314,7 +473,11 @@ export class ChatDomainError extends Error {
 // ---------------------------------------------------------------------------
 
 export interface ChatService {
-  openFromMatch(userId: string, matchId: string): Promise<OpenChatResult>;
+  openFromMatch(
+    userId: string,
+    matchId: string,
+    introMessage?: string
+  ): Promise<OpenChatResult>;
   respondToFallbackInvite(
     userId: string,
     matchId: string,
@@ -349,7 +512,7 @@ export const chatService: ChatService = {
   // -------------------------------------------------------------------------
   // openFromMatch
   // -------------------------------------------------------------------------
-  async openFromMatch(userId, matchId) {
+  async openFromMatch(userId, matchId, introMessage) {
     const match = await prisma.match.findUnique({
       where: { id: matchId },
       include: matchForOpenChatInclude
@@ -392,7 +555,7 @@ export const chatService: ChatService = {
       });
     }
 
-    // REQUEST_TO_REQUEST: open chat immediately.
+    // REQUEST_TO_REQUEST: send a short intro instead of opening internal chat.
     if (match.mode === "REQUEST_TO_REQUEST" && match.status === "READY") {
       const sourceOwnerId = match.sourceRequest.ownerId;
       const candidateOwnerId = match.candidateRequest?.ownerId;
@@ -405,46 +568,35 @@ export const chatService: ChatService = {
         });
       }
 
-      const otherId = userId === sourceOwnerId ? candidateOwnerId! : sourceOwnerId;
+      const existingResponse = readStoredResponse(match.reasonDetails);
+      if (existingResponse) {
+        return { status: "RESPONSE_SENT", matchId: match.id };
+      }
 
-      await assertChatLimitNotReached(userId);
-      await assertChatLimitNotReached(otherId);
-
+      const text = normalizeIntroMessage(introMessage);
       const now = new Date();
-      // Deterministic userA/userB assignment: lexicographically smaller ID = userA.
-      const [userAId, userBId] = [userId, otherId].sort();
-
-      const chat = await prisma.chat.create({
+      await prisma.match.update({
+        where: { id: match.id },
         data: {
-          matchId: match.id,
-          userAId,
-          userBId,
-          status: "ACTIVE",
-          lastMessageAt: now,
-          staleAfterAt: buildStaleAfterAt(now)
+          reasonDetails: buildReasonDetailsWithResponse(match.reasonDetails, {
+            status: "SENT",
+            introMessage: text,
+            sentByUserId: userId,
+            sentAt: now.toISOString()
+          })
         }
       });
 
-      await prisma.message.create({
-        data: {
-          chatId: chat.id,
-          senderId: null,
-          type: "SYSTEM",
-          text: "Чат открыт. Можно начать разговор."
-        }
-      });
-
-      await analyticsService.track("open_chat", {
-        chatId: chat.id,
+      await analyticsService.track("response_sent", {
         matchId: match.id,
         scenario: match.sourceRequest.scenario,
         userId
       });
 
-      return { status: "CHAT_READY", chatId: chat.id };
+      return { status: "RESPONSE_SENT", matchId: match.id };
     }
 
-    // REQUEST_TO_PROFILE: source request owner sends invite.
+    // REQUEST_TO_PROFILE: source request owner sends an intro to the fallback profile.
     if (
       match.mode === "REQUEST_TO_PROFILE" &&
       match.status === "PENDING_RECIPIENT_ACCEPTANCE"
@@ -457,13 +609,36 @@ export const chatService: ChatService = {
           status: 403
         });
       }
-      // No state change needed: match is already PENDING_RECIPIENT_ACCEPTANCE.
-      return { status: "INVITE_SENT", matchId: match.id };
+      const existingResponse = readStoredResponse(match.reasonDetails);
+      if (!existingResponse) {
+        const text = normalizeIntroMessage(introMessage);
+        const now = new Date();
+
+        await prisma.match.update({
+          where: { id: match.id },
+          data: {
+            reasonDetails: buildReasonDetailsWithResponse(match.reasonDetails, {
+              status: "SENT",
+              introMessage: text,
+              sentByUserId: userId,
+              sentAt: now.toISOString()
+            })
+          }
+        });
+      }
+
+      await analyticsService.track("response_sent", {
+        matchId: match.id,
+        scenario: match.sourceRequest.scenario,
+        userId
+      });
+
+      return { status: "RESPONSE_SENT", matchId: match.id };
     }
 
     throw new ChatDomainError({
       code: "match_state_invalid",
-      message: "Приглашение отправлено. Чат появится после принятия.",
+      message: "Отклик уже отправлен. Дождитесь ответа.",
       status: 409
     });
   },
@@ -485,52 +660,81 @@ export const chatService: ChatService = {
       });
     }
 
-    if (match.mode !== "REQUEST_TO_PROFILE") {
+    const storedResponse = readStoredResponse(match.reasonDetails);
+
+    if (!storedResponse || storedResponse.status !== "SENT") {
       throw new ChatDomainError({
-        code: "respond_not_applicable",
-        message: "Матч требует приглашения и пока не готов к чату.",
+        code: "response_not_pending",
+        message: "Нет отклика, который нужно принять или отклонить.",
         status: 409
       });
     }
 
-    if (match.status !== "PENDING_RECIPIENT_ACCEPTANCE") {
-      throw new ChatDomainError({
-        code: "match_not_pending",
-        message: "Приглашение уже было обработано.",
-        status: 409
-      });
-    }
-
-    if (match.candidateProfile?.userId !== userId) {
+    if (storedResponse.sentByUserId === userId) {
       throw new ChatDomainError({
         code: "respond_forbidden",
-        message: "Ответить на приглашение может только получатель.",
+        message: "Нельзя принять собственный отклик.",
         status: 403
       });
     }
 
-    // If a chat somehow already exists, return it.
+    const participantIds =
+      match.mode === "REQUEST_TO_REQUEST"
+        ? [match.sourceRequest.ownerId, match.candidateRequest?.ownerId].filter(Boolean)
+        : [match.sourceRequest.ownerId, match.candidateProfile?.userId].filter(Boolean);
+
+    if (!participantIds.includes(userId)) {
+      throw new ChatDomainError({
+        code: "respond_forbidden",
+        message: "Ответить на отклик может только получатель.",
+        status: 403
+      });
+    }
+
+    const senderTelegramUsername =
+      storedResponse.sentByUserId === match.sourceRequest.ownerId
+        ? match.sourceRequest.owner.profile?.telegramUsername ??
+          match.sourceRequest.owner.username
+        : match.mode === "REQUEST_TO_REQUEST"
+          ? match.candidateRequest?.owner.profile?.telegramUsername ??
+            match.candidateRequest?.owner.username
+          : match.candidateProfile?.telegramUsername ??
+            match.candidateProfile?.user.username;
+    const acceptedContact = buildAcceptedContactResult(senderTelegramUsername);
+
     if (match.chat) {
       if (decision === "ACCEPT") {
-        return { status: "ACCEPTED", chatId: match.chat.id };
+        return {
+          status: "ACCEPTED",
+          chatId: match.chat.id,
+          ...acceptedContact
+        };
       }
     }
 
     if (decision === "DECLINE") {
       await prisma.match.update({
         where: { id: matchId },
-        data: { status: "DECLINED" }
+        data: {
+          status: "DECLINED",
+          reasonDetails: buildReasonDetailsWithResponse(match.reasonDetails, {
+            ...storedResponse,
+            status: "DECLINED",
+            decidedByUserId: userId,
+            decidedAt: new Date().toISOString()
+          })
+        }
       });
       return { status: "DECLINED", matchId };
     }
 
     // ACCEPT
-    const sourceOwnerId = match.sourceRequest.ownerId;
-    await assertChatLimitNotReached(sourceOwnerId);
+    const senderUserId = storedResponse.sentByUserId;
+    await assertChatLimitNotReached(senderUserId);
     await assertChatLimitNotReached(userId);
 
     const now = new Date();
-    const [userAId, userBId] = [sourceOwnerId, userId].sort();
+    const [userAId, userBId] = [senderUserId, userId].sort();
 
     const chat = await prisma.$transaction(async (tx) => {
       const created = await tx.chat.create({
@@ -539,6 +743,17 @@ export const chatService: ChatService = {
           userAId,
           userBId,
           status: "ACTIVE",
+          contactExchangeStatus: "MUTUAL_CONSENT",
+          contactSharedAt: now,
+          ...(userAId === senderUserId
+            ? {
+                userAContactAcceptedAt: now,
+                userBContactAcceptedAt: now
+              }
+            : {
+                userAContactAcceptedAt: now,
+                userBContactAcceptedAt: now
+              }),
           lastMessageAt: now,
           staleAfterAt: buildStaleAfterAt(now)
         }
@@ -546,7 +761,24 @@ export const chatService: ChatService = {
 
       await tx.match.update({
         where: { id: matchId },
-        data: { status: "READY" }
+        data: {
+          status: "READY",
+          reasonDetails: buildReasonDetailsWithResponse(match.reasonDetails, {
+            ...storedResponse,
+            status: "ACCEPTED",
+            decidedByUserId: userId,
+            decidedAt: now.toISOString()
+          })
+        }
+      });
+
+      await tx.message.create({
+        data: {
+          chatId: created.id,
+          senderId: senderUserId,
+          type: "USER",
+          text: storedResponse.introMessage
+        }
       });
 
       await tx.message.create({
@@ -554,7 +786,7 @@ export const chatService: ChatService = {
           chatId: created.id,
           senderId: null,
           type: "SYSTEM",
-          text: "Приглашение принято. Чат открыт."
+          text: "Отклик принят. Дальше можно связаться в Telegram."
         }
       });
 
@@ -568,7 +800,11 @@ export const chatService: ChatService = {
       userId
     });
 
-    return { status: "ACCEPTED", chatId: chat.id };
+    return {
+      status: "ACCEPTED",
+      chatId: chat.id,
+      ...acceptedContact
+    };
   },
 
   // -------------------------------------------------------------------------

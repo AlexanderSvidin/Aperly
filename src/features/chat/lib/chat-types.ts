@@ -54,10 +54,17 @@ export type SerializedChatMessages = {
 
 export type OpenChatResult =
   | { status: "CHAT_READY"; chatId: string }
-  | { status: "INVITE_SENT"; matchId: string };
+  | { status: "INVITE_SENT"; matchId: string }
+  | { status: "RESPONSE_SENT"; matchId: string };
 
 export type RespondResult =
-  | { status: "ACCEPTED"; chatId: string }
+  | {
+      status: "ACCEPTED";
+      chatId: string;
+      telegramUsername: string | null;
+      telegramUrl: string | null;
+      contactHint: string;
+    }
   | { status: "DECLINED"; matchId: string };
 
 export type ContactExchangeState = {

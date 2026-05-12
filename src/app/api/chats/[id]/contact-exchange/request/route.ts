@@ -26,7 +26,7 @@ function buildErrorResponse(error: unknown) {
     );
   }
   return NextResponse.json(
-    { message: "Не удалось отправить запрос на обмен контактами." },
+    { message: "Не удалось запросить контакт." },
     { status: 500 }
   );
 }
@@ -42,7 +42,7 @@ export async function POST(request: Request, { params }: RouteProps) {
 
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { message: "Слишком много запросов на обмен контактами. Попробуйте позже." },
+        { message: "Слишком много запросов контакта. Попробуйте позже." },
         {
           status: 429,
           headers: {

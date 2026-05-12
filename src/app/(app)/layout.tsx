@@ -11,5 +11,9 @@ export default async function AppShellLayout({
   const user = await requirePageUser();
   const viewerName = user.profile?.fullName ?? user.firstName;
 
-  return <MobileAppShell viewerName={viewerName}>{children}</MobileAppShell>;
+  return (
+    <MobileAppShell key={user.id} viewerName={viewerName}>
+      {children}
+    </MobileAppShell>
+  );
 }

@@ -113,3 +113,41 @@ export async function PUT(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  const user = await getRequestSessionUser(
+    extractSessionCookieValue(request.headers.get("cookie"))
+  );
+
+  if (!user) {
+    return NextResponse.json(
+      {
+        message: "Требуется авторизация."
+      },
+      {
+        status: 401
+      }
+    );
+  }
+
+  try {
+    await profileService.deleteProfile(user.id);
+
+    const response = NextResponse.json({
+      deleted: true
+    });
+    response.cookies.set(buildClearedAppSessionCookie());
+
+    return response;
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error ? error.message : "Не удалось удалить профиль."
+      },
+      {
+        status: 400
+      }
+    );
+  }
+}

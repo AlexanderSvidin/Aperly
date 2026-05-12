@@ -6,6 +6,7 @@ import type {
   SerializedMatchDimension,
   SerializedMatchListItem,
   SerializedMatchProfileCard,
+  SerializedMatchResponse,
   SerializedMatchRequestCard,
   SerializedMatchRequestSummary,
   SerializedMatchesScreenData,
@@ -20,6 +21,7 @@ import {
   studyFrequencyOptions
 } from "@/features/requests/lib/request-options";
 import { getProgramLabel } from "@/features/study/lib/study-catalog";
+import { analyticsService } from "@/server/services/analytics/analytics-service";
 import { buildDiscoverableFallbackProfileWhere, buildEligibleRequestWhere } from "@/server/services/matching/match-eligibility";
 
 const MATCH_LIMIT = 10;
@@ -193,7 +195,9 @@ type RecomputeResult = {
   requestId: string;
   refreshed: true;
   matchCount: number;
+  newMatchCount?: number;
   fallbackUsed: boolean;
+  collection?: SerializedRequestMatches;
 };
 
 function buildCanonicalRequestPairKey(leftId: string, rightId: string) {
@@ -712,6 +716,28 @@ function buildReasonSummary(
   }
 
   return `${topLabels[0]} • ${topLabels[1].toLowerCase()}`;
+}
+
+const publicReasonLabels: Record<string, string> = {
+  availability_overlap: "Похоже удобное время",
+  commitment_fit: "Похожая вовлечённость",
+  event_relevance: "Похожая цель",
+  format_fit: "Подходит формат",
+  goal_fit: "Похожая цель",
+  profile_completeness: "Профиль достаточно заполнен",
+  rhythm_fit: "Подходит ритм занятий",
+  role_fit: "Есть нужная роль",
+  skill_fit: "Есть нужный навык",
+  stage_fit: "Похожая стадия проекта",
+  subject_fit: "Совпадает предмет"
+};
+
+export function buildPublicMatchReasons(dimensions: SerializedMatchDimension[]) {
+  return dimensions
+    .filter((dimension) => dimension.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 4)
+    .map((dimension) => publicReasonLabels[dimension.key] ?? dimension.label);
 }
 
 function attachSummaryLabels(
@@ -1271,6 +1297,7 @@ function buildMatchReasonDetails(input: {
 }) {
   return {
     dimensions: input.dimensions,
+    reasons: buildPublicMatchReasons(input.dimensions),
     requestCandidatePoolSize: input.requestCandidatePoolSize,
     fallbackCandidatePoolSize: input.fallbackCandidatePoolSize,
     fallbackUsed: input.fallbackUsed,
@@ -1278,6 +1305,19 @@ function buildMatchReasonDetails(input: {
     candidateRequestId: input.candidateRequestId ?? null,
     candidateProfileId: input.candidateProfileId ?? null
   };
+}
+
+async function buildReasonDetailsWithPreservedResponse(
+  pairKey: string,
+  details: ReturnType<typeof buildMatchReasonDetails>
+) {
+  const existing = await prisma.match.findUnique({
+    where: { pairKey },
+    select: { reasonDetails: true }
+  });
+  const response = readStoredResponse(existing?.reasonDetails ?? null);
+
+  return response ? { ...details, response } : details;
 }
 
 function readStoredDimensions(reasonDetails: Prisma.JsonValue | null): SerializedMatchDimension[] {
@@ -1318,6 +1358,68 @@ function readStoredDimensions(reasonDetails: Prisma.JsonValue | null): Serialize
     label: key,
     score: Array.isArray(value) ? 20 : typeof value === "string" ? 15 : 10
   }));
+}
+
+function readStoredReasons(reasonDetails: Prisma.JsonValue | null) {
+  if (!reasonDetails || typeof reasonDetails !== "object" || Array.isArray(reasonDetails)) {
+    return [];
+  }
+
+  if (
+    "reasons" in reasonDetails &&
+    Array.isArray((reasonDetails as { reasons?: unknown[] }).reasons)
+  ) {
+    return ((reasonDetails as { reasons: unknown[] }).reasons ?? []).filter(
+      (reason): reason is string =>
+        typeof reason === "string" && reason.trim().length > 0
+    );
+  }
+
+  return [];
+}
+
+type StoredMatchResponse = {
+  status: "SENT" | "ACCEPTED" | "DECLINED";
+  introMessage: string;
+  sentByUserId: string;
+  sentAt: string;
+  decidedByUserId?: string | null;
+  decidedAt?: string | null;
+};
+
+function readStoredResponse(
+  reasonDetails: Prisma.JsonValue | null
+): StoredMatchResponse | null {
+  if (!reasonDetails || typeof reasonDetails !== "object" || Array.isArray(reasonDetails)) {
+    return null;
+  }
+
+  const response = (reasonDetails as { response?: unknown }).response;
+
+  if (!response || typeof response !== "object" || Array.isArray(response)) {
+    return null;
+  }
+
+  const raw = response as Record<string, unknown>;
+
+  if (
+    (raw.status === "SENT" || raw.status === "ACCEPTED" || raw.status === "DECLINED") &&
+    typeof raw.introMessage === "string" &&
+    typeof raw.sentByUserId === "string" &&
+    typeof raw.sentAt === "string"
+  ) {
+    return {
+      status: raw.status,
+      introMessage: raw.introMessage,
+      sentByUserId: raw.sentByUserId,
+      sentAt: raw.sentAt,
+      decidedByUserId:
+        typeof raw.decidedByUserId === "string" ? raw.decidedByUserId : null,
+      decidedAt: typeof raw.decidedAt === "string" ? raw.decidedAt : null
+    };
+  }
+
+  return null;
 }
 
 function isRequestEligibleForMatching(request: MatchRequestRecord | null | undefined, now: Date) {
@@ -1445,6 +1547,81 @@ function getCounterpartyRequest(match: StoredMatchRecord, requestId: string) {
   return null;
 }
 
+function normalizeTelegramUsername(value: string | null | undefined) {
+  const username = value?.trim().replace(/^@+/, "");
+
+  return username || null;
+}
+
+function buildTelegramUrl(value: string | null | undefined) {
+  const username = normalizeTelegramUsername(value);
+
+  return username ? `https://t.me/${username}` : null;
+}
+
+function buildResponseState(input: {
+  match: StoredMatchRecord;
+  viewerUserId: string;
+  counterpartyUserId: string;
+  counterpartyTelegramUsername: string | null | undefined;
+}): SerializedMatchResponse {
+  const storedResponse = readStoredResponse(input.match.reasonDetails);
+
+  if (!storedResponse) {
+    return {
+      status: "NONE",
+      introMessage: null,
+      sentByMe: false,
+      canSendIntro:
+        input.match.status === "READY" ||
+        input.match.status === "PENDING_RECIPIENT_ACCEPTANCE",
+      canAccept: false,
+      canDecline: false,
+      telegramUsername: null,
+      telegramUrl: null,
+      contactHint: "Контакт откроется после принятия отклика."
+    };
+  }
+
+  const sentByMe = storedResponse.sentByUserId === input.viewerUserId;
+  const visibleTelegramUsername =
+    storedResponse.status === "ACCEPTED"
+      ? normalizeTelegramUsername(input.counterpartyTelegramUsername)
+      : null;
+  const telegramUrl =
+    storedResponse.status === "ACCEPTED"
+      ? buildTelegramUrl(input.counterpartyTelegramUsername)
+      : null;
+
+  return {
+    status:
+      storedResponse.status === "SENT"
+        ? sentByMe
+          ? "SENT"
+          : "RECEIVED"
+        : storedResponse.status,
+    introMessage: storedResponse.introMessage,
+    sentByMe,
+    canSendIntro: false,
+    canAccept:
+      storedResponse.status === "SENT" &&
+      !sentByMe &&
+      storedResponse.sentByUserId === input.counterpartyUserId,
+    canDecline:
+      storedResponse.status === "SENT" &&
+      !sentByMe &&
+      storedResponse.sentByUserId === input.counterpartyUserId,
+    telegramUsername: visibleTelegramUsername,
+    telegramUrl,
+    contactHint:
+      storedResponse.status !== "ACCEPTED"
+        ? "Контакт скрыт до принятия отклика."
+        : telegramUrl
+          ? "Можно написать в Telegram."
+          : "Контакт недоступен: у человека нет открытого Telegram username."
+  };
+}
+
 function isVisibleMatchForRequest(
   match: StoredMatchRecord,
   request: MatchRequestRecord,
@@ -1471,10 +1648,21 @@ function serializeStoredMatch(
   match: StoredMatchRecord,
   requestId: string
 ): SerializedMatchListItem | null {
+  const storedDimensions = readStoredDimensions(match.reasonDetails);
+  const storedReasons = readStoredReasons(match.reasonDetails);
+  const reasons =
+    storedReasons.length > 0 ? storedReasons : buildPublicMatchReasons(storedDimensions);
+
   if (match.mode === "REQUEST_TO_REQUEST") {
     const counterpartyRequest = getCounterpartyRequest(match, requestId);
+    const viewerRequest =
+      match.sourceRequestId === requestId
+        ? match.sourceRequest
+        : match.candidateRequestId === requestId
+          ? match.candidateRequest
+          : null;
 
-    if (!counterpartyRequest) {
+    if (!counterpartyRequest || !viewerRequest) {
       return null;
     }
 
@@ -1484,10 +1672,19 @@ function serializeStoredMatch(
       status: match.status,
       score: match.score,
       reasonSummary: match.reasonSummary,
-      dimensions: readStoredDimensions(match.reasonDetails),
+      reasons,
+      dimensions: storedDimensions,
       candidateProfile: buildProfileCardFromRequest(counterpartyRequest),
       candidateRequest: buildRequestCard(counterpartyRequest),
       chatReadiness: "READY_FOR_CHAT",
+      response: buildResponseState({
+        match,
+        viewerUserId: viewerRequest.ownerId,
+        counterpartyUserId: counterpartyRequest.ownerId,
+        counterpartyTelegramUsername:
+          counterpartyRequest.owner.profile?.telegramUsername ??
+          counterpartyRequest.owner.username
+      }),
       computedAt: match.computedAt.toISOString(),
       expiresAt: match.expiresAt?.toISOString() ?? null
     };
@@ -1503,10 +1700,18 @@ function serializeStoredMatch(
     status: match.status,
     score: match.score,
     reasonSummary: match.reasonSummary,
-    dimensions: readStoredDimensions(match.reasonDetails),
+    reasons,
+    dimensions: storedDimensions,
     candidateProfile: buildProfileCardFromProfile(match.candidateProfile),
     candidateRequest: null,
-    chatReadiness: "INVITE_REQUIRED",
+    chatReadiness: match.chat ? "READY_FOR_CHAT" : "INVITE_REQUIRED",
+    response: buildResponseState({
+      match,
+      viewerUserId: match.sourceRequest.ownerId,
+      counterpartyUserId: match.candidateProfile.userId,
+      counterpartyTelegramUsername:
+        match.candidateProfile.telegramUsername ?? match.candidateProfile.user.username
+    }),
     computedAt: match.computedAt.toISOString(),
     expiresAt: match.expiresAt?.toISOString() ?? null
   };
@@ -1659,6 +1864,17 @@ async function persistMatchesForRequest(
     keepPairKeys.add(pairKey);
     touchedRequestIds.add(sortedIds[0]);
     touchedRequestIds.add(sortedIds[1]);
+    const reasonDetails = await buildReasonDetailsWithPreservedResponse(
+      pairKey,
+      buildMatchReasonDetails({
+        sourceRequestId: sourceRequest.id,
+        candidateRequestId: candidate.request.id,
+        dimensions: candidate.dimensions,
+        requestCandidatePoolSize: poolInfo.requestCandidatePoolSize,
+        fallbackCandidatePoolSize: poolInfo.fallbackCandidatePoolSize,
+        fallbackUsed: poolInfo.fallbackUsed
+      })
+    );
 
     await prisma.match.upsert({
       where: {
@@ -1673,14 +1889,7 @@ async function persistMatchesForRequest(
         candidateRequestId: sortedIds[1],
         score: candidate.score,
         reasonSummary: candidate.reasonSummary,
-        reasonDetails: buildMatchReasonDetails({
-          sourceRequestId: sourceRequest.id,
-          candidateRequestId: candidate.request.id,
-          dimensions: candidate.dimensions,
-          requestCandidatePoolSize: poolInfo.requestCandidatePoolSize,
-          fallbackCandidatePoolSize: poolInfo.fallbackCandidatePoolSize,
-          fallbackUsed: poolInfo.fallbackUsed
-        }),
+        reasonDetails,
         computedAt: now,
         expiresAt: candidate.expiresAt
       },
@@ -1693,14 +1902,7 @@ async function persistMatchesForRequest(
         candidateProfileId: null,
         score: candidate.score,
         reasonSummary: candidate.reasonSummary,
-        reasonDetails: buildMatchReasonDetails({
-          sourceRequestId: sourceRequest.id,
-          candidateRequestId: candidate.request.id,
-          dimensions: candidate.dimensions,
-          requestCandidatePoolSize: poolInfo.requestCandidatePoolSize,
-          fallbackCandidatePoolSize: poolInfo.fallbackCandidatePoolSize,
-          fallbackUsed: poolInfo.fallbackUsed
-        }),
+        reasonDetails,
         computedAt: now,
         expiresAt: candidate.expiresAt
       }
@@ -1709,6 +1911,17 @@ async function persistMatchesForRequest(
 
   for (const candidate of fallbackMatches) {
     keepPairKeys.add(candidate.pairKey);
+    const reasonDetails = await buildReasonDetailsWithPreservedResponse(
+      candidate.pairKey,
+      buildMatchReasonDetails({
+        sourceRequestId: sourceRequest.id,
+        candidateProfileId: candidate.profile.id,
+        dimensions: candidate.dimensions,
+        requestCandidatePoolSize: poolInfo.requestCandidatePoolSize,
+        fallbackCandidatePoolSize: poolInfo.fallbackCandidatePoolSize,
+        fallbackUsed: poolInfo.fallbackUsed
+      })
+    );
 
     await prisma.match.upsert({
       where: {
@@ -1723,14 +1936,7 @@ async function persistMatchesForRequest(
         candidateProfileId: candidate.profile.id,
         score: candidate.score,
         reasonSummary: candidate.reasonSummary,
-        reasonDetails: buildMatchReasonDetails({
-          sourceRequestId: sourceRequest.id,
-          candidateProfileId: candidate.profile.id,
-          dimensions: candidate.dimensions,
-          requestCandidatePoolSize: poolInfo.requestCandidatePoolSize,
-          fallbackCandidatePoolSize: poolInfo.fallbackCandidatePoolSize,
-          fallbackUsed: poolInfo.fallbackUsed
-        }),
+        reasonDetails,
         computedAt: now,
         expiresAt: candidate.expiresAt
       },
@@ -1743,14 +1949,7 @@ async function persistMatchesForRequest(
         candidateProfileId: candidate.profile.id,
         score: candidate.score,
         reasonSummary: candidate.reasonSummary,
-        reasonDetails: buildMatchReasonDetails({
-          sourceRequestId: sourceRequest.id,
-          candidateProfileId: candidate.profile.id,
-          dimensions: candidate.dimensions,
-          requestCandidatePoolSize: poolInfo.requestCandidatePoolSize,
-          fallbackCandidatePoolSize: poolInfo.fallbackCandidatePoolSize,
-          fallbackUsed: poolInfo.fallbackUsed
-        }),
+        reasonDetails,
         computedAt: now,
         expiresAt: candidate.expiresAt
       }
@@ -2105,7 +2304,29 @@ export const matchingService: MatchingService = {
       });
     }
 
-    return this.refreshForRequest(requestId);
+    const before = await this.listForOwnedRequest(userId, requestId);
+    const beforeMatchIds = new Set(before.matches.map((match) => match.id));
+    const result = await this.refreshForRequest(requestId);
+    const collection = await this.listForOwnedRequest(userId, requestId);
+    const newMatchCount = collection.matches.filter(
+      (match) => !beforeMatchIds.has(match.id)
+    ).length;
+
+    await analyticsService.track("match_refresh_completed", {
+      requestId,
+      userId,
+      matchCount: collection.matches.length,
+      newMatchCount,
+      fallbackUsed: collection.fallbackUsed
+    });
+
+    return {
+      ...result,
+      matchCount: collection.matches.length,
+      newMatchCount,
+      fallbackUsed: collection.fallbackUsed,
+      collection
+    };
   },
 
   async listForOwnedRequest(userId, requestId) {
