@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useRef, useState } from "react";
 
@@ -132,6 +132,10 @@ function createDefaultDraft(
   scenario: RequestScenario,
   subjects: SubjectOption[]
 ): RequestDraft {
+  if (scenario === "ACTIVITY") {
+    scenario = "STUDY";
+  }
+
   if (scenario === "CASE") {
     return {
       scenario,
@@ -215,6 +219,20 @@ function createDraftFromRequest(request: SerializedRequest): RequestDraft {
       }
     };
   }
+  if (request.details.type === "ACTIVITY") {
+    return {
+      scenario: "PROJECT",
+      notes: request.notes ?? "",
+      details: {
+        projectTitle: request.details.title,
+        shortDescription: request.details.comment ?? "Активность",
+        stage: "IDEA",
+        neededRoles: ["OTHER"],
+        expectedCommitment: "FLEXIBLE",
+        preferredFormat: request.details.preferredFormat
+      }
+    };
+  }
 
   return {
     scenario: "STUDY",
@@ -274,6 +292,10 @@ function summarizeRequest(request: SerializedRequest) {
     return request.details.projectTitle;
   }
 
+  if (request.details.type === "ACTIVITY") {
+    return request.details.title;
+  }
+
   return request.details.subjectName;
 }
 
@@ -300,6 +322,13 @@ function describeRequest(request: SerializedRequest) {
       projectStageOptions,
       request.details.stage
     ).toLowerCase()}, формат ${findOptionLabel(
+      requestFormatOptions,
+      request.details.preferredFormat
+    ).toLowerCase()}`;
+  }
+
+  if (request.details.type === "ACTIVITY") {
+    return `активность, формат ${findOptionLabel(
       requestFormatOptions,
       request.details.preferredFormat
     ).toLowerCase()}`;
@@ -661,7 +690,7 @@ export function RequestComposerShell({
 
       if (!isEditingExistingRequest) {
         router.push(
-          `/matches?requestId=${result.request.id}&created=1` as Route
+          `/requests/${result.request.id}/matches?created=1` as Route
         );
         router.refresh();
       }
@@ -962,6 +991,11 @@ export function RequestComposerShell({
                   <Button
                     fullWidth
                     onClick={() => {
+                      if (scenario.value === "ACTIVITY") {
+                        router.push("/create/activity");
+                        return;
+                      }
+
                       if (request?.status === "ACTIVE") {
                         startEditingRequest(request);
                         scrollToForm();
@@ -1015,7 +1049,7 @@ export function RequestComposerShell({
                     </Button>
                   ) : null}
 
-                  {request?.status === "EXPIRED" ? (
+                  {request?.status === "EXPIRED" || request?.status === "PAUSED" ? (
                     <Button
                       disabled={hasBusyAction()}
                       fullWidth
@@ -1652,7 +1686,9 @@ export function RequestComposerShell({
               const pauseKey = buildRequestActionKey("pause", request.id);
               const renewKey = buildRequestActionKey("renew", request.id);
               const secondaryActionKey =
-                request.status === "EXPIRED" ? renewKey : archiveKey;
+                request.status === "EXPIRED" || request.status === "PAUSED"
+                  ? renewKey
+                  : archiveKey;
 
               return (
               <div key={request.id} className="request-history-row">
@@ -1732,12 +1768,12 @@ export function RequestComposerShell({
                       disabled={hasBusyAction()}
                       isLoading={isActionBusy(secondaryActionKey)}
                       loadingLabel={
-                        request.status === "EXPIRED"
+                        request.status === "EXPIRED" || request.status === "PAUSED"
                           ? "Возобновляем..."
                           : "Архивируем..."
                       }
                       onClick={() =>
-                        request.status === "EXPIRED"
+                        request.status === "EXPIRED" || request.status === "PAUSED"
                           ? handleRenew(request.id)
                           : handleArchive(request.id)
                       }

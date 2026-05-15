@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode
 } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   applyTelegramTheme,
@@ -68,6 +69,7 @@ async function clearServerSessionAndReload() {
 }
 
 export function TelegramAppProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [session, setSession] = useState<TelegramRuntimeSession>(defaultSession);
   // Starts true on both server and client so the first render is identical
   // (no hydration mismatch).  Becomes false once detection resolves.
@@ -201,20 +203,24 @@ export function TelegramAppProvider({ children }: { children: ReactNode }) {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        void verifyTelegramUserMatchesAppSession();
+        void verifyTelegramUserMatchesAppSession().then(() => router.refresh());
       }
     };
 
     void verifyTelegramUserMatchesAppSession();
-    window.addEventListener("focus", verifyTelegramUserMatchesAppSession);
+    const handleFocus = () => {
+      void verifyTelegramUserMatchesAppSession().then(() => router.refresh());
+    };
+
+    window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       isCancelled = true;
-      window.removeEventListener("focus", verifyTelegramUserMatchesAppSession);
+      window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [session]);
+  }, [router, session]);
 
   return (
     <TelegramAppContext.Provider value={{ session, isDetecting }}>

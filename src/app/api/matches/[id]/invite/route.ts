@@ -1,0 +1,80 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import {
+  ApiUserAccessError,
+  buildApiUserAccessErrorResponse,
+  requireApiUserFromRequest
+} from "@/server/services/auth/api-user-guard";
+import {
+  ConnectionDomainError,
+  connectionService
+} from "@/server/services/connections/connection-service";
+
+type RouteProps = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
+const inviteBodySchema = z.object({
+  message: z.string().trim().min(10).max(700)
+});
+
+function buildErrorResponse(error: unknown) {
+  if (error instanceof ApiUserAccessError) {
+    return buildApiUserAccessErrorResponse(error);
+  }
+
+  if (error instanceof ConnectionDomainError) {
+    return NextResponse.json(
+      {
+        code: error.code,
+        message: error.message
+      },
+      {
+        status: error.status
+      }
+    );
+  }
+
+  return NextResponse.json(
+    {
+      message: "Не удалось отправить приглашение."
+    },
+    {
+      status: 500
+    }
+  );
+}
+
+export async function POST(request: Request, { params }: RouteProps) {
+  try {
+    const user = await requireApiUserFromRequest(request);
+    const { id: matchId } = await params;
+    const body = await request.json().catch(() => null);
+    const parsed = inviteBodySchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          message: "Коротко напишите, почему приглашаете человека.",
+          errors: parsed.error.flatten()
+        },
+        {
+          status: 400
+        }
+      );
+    }
+
+    const interaction = await connectionService.createInvitationFromMatch(
+      user.id,
+      matchId,
+      parsed.data.message
+    );
+
+    return NextResponse.json({ interaction });
+  } catch (error) {
+    return buildErrorResponse(error);
+  }
+}

@@ -1,7 +1,4 @@
-import { RequestComposerShell } from "@/features/requests/components/request-composer-shell";
-import type { RequestScenario } from "@/features/requests/lib/request-schema";
-import { requirePageUser } from "@/server/services/auth/current-user";
-import { requestService } from "@/server/services/requests/request-service";
+import { redirect } from "next/navigation";
 
 type NewRequestPageProps = {
   searchParams?: Promise<{
@@ -9,28 +6,15 @@ type NewRequestPageProps = {
   }>;
 };
 
-function resolveScenarioParam(value: string | string[] | undefined): RequestScenario | undefined {
-  const rawScenario = Array.isArray(value) ? value[0] : value;
-
-  if (rawScenario === "CASE" || rawScenario === "PROJECT" || rawScenario === "STUDY") {
-    return rawScenario;
-  }
-
-  return undefined;
+function readSingleSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function NewRequestPage({ searchParams }: NewRequestPageProps) {
-  const user = await requirePageUser();
+export default async function NewRequestPage({
+  searchParams
+}: NewRequestPageProps) {
   const resolvedSearchParams = await searchParams;
-  const composerData = await requestService.getComposerData(user.id);
+  const scenario = readSingleSearchParam(resolvedSearchParams?.scenario);
 
-  return (
-    <RequestComposerShell
-      initialScenario={resolveScenarioParam(resolvedSearchParams?.scenario)}
-      initialRequests={composerData.requests}
-      key={user.id}
-      studyDefaults={composerData.studyDefaults}
-      subjects={composerData.subjects}
-    />
-  );
+  redirect(scenario ? `/create?scenario=${scenario}` : "/create");
 }

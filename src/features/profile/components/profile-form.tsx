@@ -368,7 +368,7 @@ export function ProfileForm({ initialValues, lookups, mode }: ProfileFormProps) 
       }
 
       if (mode === "onboarding") {
-        router.push("/home?welcome=1");
+        router.push("/opportunities?welcome=1");
         router.refresh();
         return;
       }

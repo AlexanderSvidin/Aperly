@@ -22,6 +22,7 @@ import {
 } from "@/features/requests/lib/request-options";
 import { getProgramLabel } from "@/features/study/lib/study-catalog";
 import { analyticsService } from "@/server/services/analytics/analytics-service";
+import { connectionService } from "@/server/services/connections/connection-service";
 import { buildDiscoverableFallbackProfileWhere, buildEligibleRequestWhere } from "@/server/services/matching/match-eligibility";
 
 const MATCH_LIMIT = 10;
@@ -101,6 +102,7 @@ const requestInclude = {
   },
   caseDetails: true,
   projectDetails: true,
+  activityDetails: true,
   studyDetails: {
     include: {
       subject: true
@@ -570,6 +572,10 @@ function getRequestPreferredFormat(request: MatchRequestRecord) {
     return request.projectDetails?.preferredFormat ?? null;
   }
 
+  if (request.scenario === "ACTIVITY") {
+    return request.activityDetails?.preferredFormat ?? null;
+  }
+
   return request.studyDetails?.preferredFormat ?? null;
 }
 
@@ -607,6 +613,22 @@ function buildRequestCard(request: MatchRequestRecord): SerializedMatchRequestCa
         request.projectDetails.expectedCommitment
       }`,
       preferredFormat: request.projectDetails.preferredFormat,
+      expiresAt: request.expiresAt.toISOString(),
+      ownerDisplayName: buildPersonDisplayName({
+        fullName: request.owner.profile?.fullName,
+        firstName: request.owner.firstName,
+        lastName: request.owner.lastName
+      })
+    };
+  }
+
+  if (request.scenario === "ACTIVITY" && request.activityDetails) {
+    return {
+      id: request.id,
+      scenario: request.scenario,
+      title: request.activityDetails.title,
+      subtitle: `${request.activityDetails.activitySubtype} • ${request.activityDetails.peopleCount} чел.`,
+      preferredFormat: request.activityDetails.preferredFormat,
       expiresAt: request.expiresAt.toISOString(),
       ownerDisplayName: buildPersonDisplayName({
         fullName: request.owner.profile?.fullName,
@@ -1283,6 +1305,55 @@ function scoreRequestCandidate(
     return scoreProjectRequestPair(source, candidate);
   }
 
+  if (source.scenario === "ACTIVITY") {
+    const formatFit = computeFormatCompatibility(
+      source.activityDetails?.preferredFormat ?? null,
+      candidate.activityDetails?.preferredFormat ?? null
+    );
+    const availabilityFit = computeAvailabilityOverlap(
+      getEffectiveAvailabilitySlots(source),
+      getEffectiveAvailabilitySlots(candidate)
+    );
+    const subtypeFit =
+      source.activityDetails?.activitySubtype &&
+      source.activityDetails.activitySubtype === candidate.activityDetails?.activitySubtype
+        ? 1
+        : 0;
+
+    const drafts: MatchDimensionDraft[] = [
+      {
+        key: "format_fit",
+        label: "Подходит формат",
+        summaryLabel: "подходит формат",
+        weight: 35,
+        value: formatFit
+      },
+      {
+        key: "availability_overlap",
+        label: "Совпадает время",
+        summaryLabel: "совпадает время",
+        weight: 35,
+        value: availabilityFit
+      },
+      {
+        key: "activity_interest",
+        label: "Похожий интерес",
+        summaryLabel: "похожий интерес",
+        weight: 30,
+        value: subtypeFit
+      }
+    ];
+    const finalized = finalizeDimensions(drafts);
+
+    return {
+      score: finalized.score,
+      dimensions: finalized.dimensions,
+      reasonSummary: buildReasonSummary(attachSummaryLabels(finalized.dimensions, drafts), [
+        "есть базовое совпадение по активности"
+      ])
+    };
+  }
+
   return scoreStudyRequestPair(source, candidate);
 }
 
@@ -1547,18 +1618,6 @@ function getCounterpartyRequest(match: StoredMatchRecord, requestId: string) {
   return null;
 }
 
-function normalizeTelegramUsername(value: string | null | undefined) {
-  const username = value?.trim().replace(/^@+/, "");
-
-  return username || null;
-}
-
-function buildTelegramUrl(value: string | null | undefined) {
-  const username = normalizeTelegramUsername(value);
-
-  return username ? `https://t.me/${username}` : null;
-}
-
 function buildResponseState(input: {
   match: StoredMatchRecord;
   viewerUserId: string;
@@ -1584,14 +1643,8 @@ function buildResponseState(input: {
   }
 
   const sentByMe = storedResponse.sentByUserId === input.viewerUserId;
-  const visibleTelegramUsername =
-    storedResponse.status === "ACCEPTED"
-      ? normalizeTelegramUsername(input.counterpartyTelegramUsername)
-      : null;
-  const telegramUrl =
-    storedResponse.status === "ACCEPTED"
-      ? buildTelegramUrl(input.counterpartyTelegramUsername)
-      : null;
+  const visibleTelegramUsername = null;
+  const telegramUrl = null;
 
   return {
     status:
@@ -1619,6 +1672,16 @@ function buildResponseState(input: {
         : telegramUrl
           ? "Можно написать в Telegram."
           : "Контакт недоступен: у человека нет открытого Telegram username."
+  };
+}
+
+function buildDefaultInvitationState() {
+  return {
+    status: "NONE" as const,
+    label: "Пригласить",
+    canAct: true,
+    interactionId: null,
+    connectionId: null
   };
 }
 
@@ -1685,6 +1748,7 @@ function serializeStoredMatch(
           counterpartyRequest.owner.profile?.telegramUsername ??
           counterpartyRequest.owner.username
       }),
+      invitationState: buildDefaultInvitationState(),
       computedAt: match.computedAt.toISOString(),
       expiresAt: match.expiresAt?.toISOString() ?? null
     };
@@ -1712,6 +1776,7 @@ function serializeStoredMatch(
       counterpartyTelegramUsername:
         match.candidateProfile.telegramUsername ?? match.candidateProfile.user.username
     }),
+    invitationState: buildDefaultInvitationState(),
     computedAt: match.computedAt.toISOString(),
     expiresAt: match.expiresAt?.toISOString() ?? null
   };
@@ -2385,7 +2450,17 @@ export const matchingService: MatchingService = {
       .map((match) => serializeStoredMatch(match, requestId))
       .filter(Boolean) as SerializedMatchListItem[];
 
-    const sortedVisibleMatches = sortMatchesByScore(visibleMatches).slice(0, MATCH_LIMIT);
+    const invitationStateByMatch = await connectionService.getInvitationStatesForMatches(
+      userId,
+      visibleMatches.map((match) => match.id)
+    );
+
+    const visibleMatchesWithState = visibleMatches.map((match) => ({
+      ...match,
+      invitationState: invitationStateByMatch.get(match.id) ?? match.invitationState
+    }));
+
+    const sortedVisibleMatches = sortMatchesByScore(visibleMatchesWithState).slice(0, MATCH_LIMIT);
 
     return {
       requestId: request.id,

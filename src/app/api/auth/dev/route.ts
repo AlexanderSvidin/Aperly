@@ -14,7 +14,7 @@ export async function POST() {
   try {
     const user = await telegramAuthService.authenticateWithDevFallback();
     const response = NextResponse.json({
-      redirectTo: user.onboardingCompleted ? "/home" : "/onboarding",
+      redirectTo: user.onboardingCompleted ? "/opportunities" : "/onboarding",
       user: serializeSessionUser(user)
     });
 

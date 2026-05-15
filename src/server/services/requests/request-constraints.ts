@@ -5,7 +5,7 @@ export const ACTIVE_REQUEST_STATUS = "ACTIVE";
 
 export function buildActiveRequestDuplicateWhere(
   ownerId: string,
-  scenario: "CASE" | "PROJECT" | "STUDY",
+  scenario: "CASE" | "PROJECT" | "STUDY" | "ACTIVITY",
   excludeRequestId?: string
 ): Prisma.RequestWhereInput {
   return {

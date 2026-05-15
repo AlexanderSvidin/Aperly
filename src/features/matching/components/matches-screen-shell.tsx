@@ -47,17 +47,19 @@ function buildMatchesHref(
 ): Route {
   const searchParams = new URLSearchParams();
 
-  if (requestId) {
-    searchParams.set("requestId", requestId);
-  }
-
   if (matchId) {
     searchParams.set("matchId", matchId);
   }
 
   const queryString = searchParams.toString();
 
-  return (queryString ? `/matches?${queryString}` : "/matches") as Route;
+  if (requestId) {
+    return (queryString
+      ? `/requests/${requestId}/matches?${queryString}`
+      : `/requests/${requestId}/matches`) as Route;
+  }
+
+  return "/connections" as Route;
 }
 
 function formatProfileMeta(match: SerializedMatchListItem) {
@@ -213,6 +215,10 @@ export function MatchesScreenShell({
       return;
     }
 
+    if (!selectedMatch.invitationState.canAct) {
+      return;
+    }
+
     const text = introMessage.trim();
 
     if (text.length < 10) {
@@ -236,23 +242,24 @@ export function MatchesScreenShell({
         message: "Готовим следующий шаг..."
       });
 
-      const response = await fetch(`/api/matches/${selectedMatch.id}/open-chat`, {
+      const response = await fetch(`/api/matches/${selectedMatch.id}/invite`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ introMessage: text })
+        body: JSON.stringify({ message: text })
       });
 
       const result = (await response.json().catch(() => null)) as
         | {
             status?: "CHAT_READY" | "INVITE_SENT" | "RESPONSE_SENT";
             chatId?: string;
+            interaction?: unknown;
             message?: string;
           }
         | null;
 
-      if (!response.ok || !result?.status) {
+      if (!response.ok || !result?.interaction) {
         const message =
           result?.message ?? "Не удалось перейти к следующему шагу по совпадению.";
         setActionStatus(actionKey, {
@@ -396,7 +403,7 @@ export function MatchesScreenShell({
               className={buttonClassName({
                 fullWidth: true
               })}
-              href="/requests/new"
+              href="/create"
             >
               Создать запрос
             </Link>
@@ -484,7 +491,7 @@ export function MatchesScreenShell({
                   fullWidth: true,
                   variant: "ghost"
                 })}
-                href="/requests/new"
+                href="/create"
               >
                 Изменить запрос
               </Link>
@@ -669,7 +676,7 @@ export function MatchesScreenShell({
               </p>
             )}
 
-            {selectedMatch.response.canSendIntro ? (
+            {selectedMatch.invitationState.status === "NONE" ? (
               <label className="field-stack">
                 <span className="field-label">Отклик</span>
                 <textarea
@@ -686,17 +693,18 @@ export function MatchesScreenShell({
               </label>
             ) : null}
 
-            {selectedMatch.response.status === "ACCEPTED" ? (
-              <p className="card-body-copy">{selectedMatch.response.contactHint}</p>
+            {selectedMatch.response.status === "ACCEPTED" && false ? (
+              <p className="card-body-copy">{selectedMatch!.response.contactHint}</p>
             ) : null}
           </div>
 
           <div className="card-actions-row card-actions-row-inline">
             {selectedMatch.response.status === "ACCEPTED" &&
-            selectedMatch.response.telegramUrl ? (
+            false &&
+            selectedMatch!.response.telegramUrl ? (
               <a
                 className={buttonClassName()}
-                href={selectedMatch.response.telegramUrl}
+                href={selectedMatch!.response.telegramUrl ?? undefined}
                 rel="noreferrer"
                 target="_blank"
               >
@@ -704,14 +712,14 @@ export function MatchesScreenShell({
               </a>
             ) : null}
 
-            {selectedMatch.response.canAccept ? (
+            {selectedMatch.response.canAccept && false ? (
               <>
                 <Button
                   disabled={
-                    isActionBusy(`response:accept:${selectedMatch.id}`) ||
-                    isActionBusy(`response:decline:${selectedMatch.id}`)
+                    isActionBusy(`response:accept:${selectedMatch!.id}`) ||
+                    isActionBusy(`response:decline:${selectedMatch!.id}`)
                   }
-                  isLoading={isActionBusy(`response:accept:${selectedMatch.id}`)}
+                  isLoading={isActionBusy(`response:accept:${selectedMatch!.id}`)}
                   loadingLabel="Принимаем..."
                   onClick={() => handleRespondToResponse("ACCEPT")}
                 >
@@ -719,10 +727,10 @@ export function MatchesScreenShell({
                 </Button>
                 <Button
                   disabled={
-                    isActionBusy(`response:accept:${selectedMatch.id}`) ||
-                    isActionBusy(`response:decline:${selectedMatch.id}`)
+                    isActionBusy(`response:accept:${selectedMatch!.id}`) ||
+                    isActionBusy(`response:decline:${selectedMatch!.id}`)
                   }
-                  isLoading={isActionBusy(`response:decline:${selectedMatch.id}`)}
+                  isLoading={isActionBusy(`response:decline:${selectedMatch!.id}`)}
                   loadingLabel="Отклоняем..."
                   onClick={() => handleRespondToResponse("DECLINE")}
                   variant="ghost"
@@ -732,10 +740,10 @@ export function MatchesScreenShell({
               </>
             ) : null}
 
-            {selectedMatch.response.canSendIntro ? (
+            {selectedMatch.invitationState.status === "NONE" ? (
               <Button
                 disabled={
-                  !getMatchUiStatus(selectedMatch).canAct ||
+                  !selectedMatch.invitationState.canAct ||
                   introMessage.trim().length < 10 ||
                   isActionBusy(`match:${selectedMatch.id}`)
                 }
@@ -743,7 +751,22 @@ export function MatchesScreenShell({
                 loadingLabel="Отправляем..."
                 onClick={handleOpenChat}
               >
-                Откликнуться
+                Пригласить
+              </Button>
+            ) : null}
+            {selectedMatch.invitationState.status === "ACCEPTED" &&
+            selectedMatch.invitationState.connectionId ? (
+              <Link
+                className={buttonClassName()}
+                href={`/connections/${selectedMatch.invitationState.connectionId}` as Route}
+              >
+                {selectedMatch.invitationState.label}
+              </Link>
+            ) : null}
+            {selectedMatch.invitationState.status !== "NONE" &&
+            selectedMatch.invitationState.status !== "ACCEPTED" ? (
+              <Button disabled variant="secondary">
+                {selectedMatch.invitationState.label}
               </Button>
             ) : null}
             <Link

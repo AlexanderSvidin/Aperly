@@ -16,7 +16,7 @@ export default async function ProfilePage() {
     editorData = await profileService.getEditorData(user.id);
     const requests = await requestService.listForUser(user.id);
     archivedRequests = requests.filter((request) =>
-      ["CLOSED", "DELETED", "EXPIRED"].includes(request.status)
+      ["CLOSED", "ARCHIVED", "DELETED", "EXPIRED"].includes(request.status)
     );
   } catch (error) {
     const message =

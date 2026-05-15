@@ -1,6 +1,4 @@
-import { MatchesScreenShell } from "@/features/matching/components/matches-screen-shell";
-import { requirePageUser } from "@/server/services/auth/current-user";
-import { matchingService } from "@/server/services/matching/matching-service";
+import { redirect } from "next/navigation";
 
 type MatchesPageProps = {
   searchParams: Promise<{
@@ -11,22 +9,33 @@ type MatchesPageProps = {
 };
 
 function readSingleSearchParam(value: string | string[] | undefined) {
-  return typeof value === "string" ? value : undefined;
+  return Array.isArray(value) ? value[0] : value;
 }
 
 export default async function MatchesPage({ searchParams }: MatchesPageProps) {
-  const user = await requirePageUser();
   const resolvedSearchParams = await searchParams;
-  const initialData = await matchingService.getScreenDataForUser(user.id, {
-    requestId: readSingleSearchParam(resolvedSearchParams.requestId),
-    matchId: readSingleSearchParam(resolvedSearchParams.matchId)
-  });
+  const requestId = readSingleSearchParam(resolvedSearchParams.requestId);
+  const matchId = readSingleSearchParam(resolvedSearchParams.matchId);
+  const created = readSingleSearchParam(resolvedSearchParams.created);
+  const nextSearchParams = new URLSearchParams();
 
-  return (
-    <MatchesScreenShell
-      creationNotice={readSingleSearchParam(resolvedSearchParams.created) === "1"}
-      initialData={initialData}
-      key={user.id}
-    />
-  );
+  if (matchId) {
+    nextSearchParams.set("matchId", matchId);
+  }
+
+  if (created) {
+    nextSearchParams.set("created", created);
+  }
+
+  if (requestId) {
+    const queryString = nextSearchParams.toString();
+
+    redirect(
+      queryString
+        ? `/requests/${requestId}/matches?${queryString}`
+        : `/requests/${requestId}/matches`
+    );
+  }
+
+  redirect("/connections");
 }

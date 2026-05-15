@@ -14,7 +14,7 @@ import {
 } from "@/features/study/lib/study-catalog";
 
 const formatValues = ["ONLINE", "OFFLINE", "HYBRID"] as const;
-const scenarioValues = ["CASE", "PROJECT", "STUDY"] as const;
+const scenarioValues = ["CASE", "PROJECT", "STUDY", "ACTIVITY"] as const;
 const languageValues = ["ENGLISH"] as const;
 const languageLevelValues = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 const dayOfWeekValues = [

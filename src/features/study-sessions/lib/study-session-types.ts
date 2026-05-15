@@ -39,7 +39,15 @@ export type SerializedStudyHomeSession = {
   status: SerializedSession["status"];
   nextAction: SerializedSession["nextAction"];
   sequenceNumber: number;
-  requestStatus: "ACTIVE" | "EXPIRED" | "CLOSED" | "DELETED" | null;
+  requestStatus:
+    | "DRAFT"
+    | "ACTIVE"
+    | "EXPIRED"
+    | "PAUSED"
+    | "CLOSED"
+    | "ARCHIVED"
+    | "DELETED"
+    | null;
   canScheduleNext: boolean;
   canFindNewPartner: boolean;
   canStopSearching: boolean;
@@ -63,7 +71,15 @@ export type SerializedStudyChatPanel = {
   requestId: string | null;
   subjectName: string;
   partnerName: string;
-  requestStatus: "ACTIVE" | "EXPIRED" | "CLOSED" | "DELETED" | null;
+  requestStatus:
+    | "DRAFT"
+    | "ACTIVE"
+    | "EXPIRED"
+    | "PAUSED"
+    | "CLOSED"
+    | "ARCHIVED"
+    | "DELETED"
+    | null;
   latestSession: SerializedSession | null;
   canScheduleFirst: boolean;
   canScheduleNext: boolean;

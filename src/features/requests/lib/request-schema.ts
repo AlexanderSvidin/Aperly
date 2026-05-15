@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { maxRequestAvailabilitySlots } from "@/features/requests/lib/request-options";
 
-const scenarioValues = ["CASE", "PROJECT", "STUDY"] as const;
+const scenarioValues = ["CASE", "PROJECT", "STUDY", "ACTIVITY"] as const;
+const activitySubtypeValues = ["CLUB", "MEETING", "SPORT", "HOBBY", "OTHER"] as const;
 const collaborationRoleValues = [
   "ANALYST",
   "DEVELOPER",
@@ -123,11 +124,43 @@ const studyRequestSchema = baseRequestSchema.extend({
   }
 });
 
+const activityRequestSchema = baseRequestSchema.extend({
+  scenario: z.literal("ACTIVITY"),
+  availabilitySlots: z.array(availabilitySlotSchema).max(maxRequestAvailabilitySlots).default([]),
+  details: z.object({
+    title: z.string().trim().min(2).max(160),
+    activitySubtype: z.enum(activitySubtypeValues),
+    time: z
+      .string()
+      .trim()
+      .optional()
+      .nullable()
+      .transform((value) => (value ? value : null))
+      .refine((value) => value === null || !Number.isNaN(Date.parse(value)), {
+        message: "Дата активности некорректна."
+      }),
+    preferredFormat: z.enum(formatValues),
+    location: z.string().trim().max(160).optional().nullable(),
+    peopleCount: z.number().int().min(1).max(50),
+    recurrence: z.enum(studyFrequencyValues),
+    comment: z.string().trim().max(600).optional().nullable()
+  })
+}).superRefine((value, context) => {
+  if (!value.details.time && value.details.recurrence === "ONCE") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["details", "time"],
+      message: "Для разовой активности укажите дату или выберите регулярность."
+    });
+  }
+});
+
 export const requestInputSchema = z
   .discriminatedUnion("scenario", [
     caseRequestSchema,
     projectRequestSchema,
-    studyRequestSchema
+    studyRequestSchema,
+    activityRequestSchema
   ])
   .transform((value) => ({
     ...value,
@@ -152,7 +185,14 @@ export type RequestInput = z.infer<typeof requestInputSchema>;
 export type SerializedRequest = {
   id: string;
   scenario: RequestScenario;
-  status: "ACTIVE" | "EXPIRED" | "CLOSED" | "DELETED";
+  status:
+    | "DRAFT"
+    | "ACTIVE"
+    | "EXPIRED"
+    | "PAUSED"
+    | "CLOSED"
+    | "ARCHIVED"
+    | "DELETED";
   notes: string | null;
   expiresAt: string;
   createdAt: string;
@@ -192,5 +232,16 @@ export type SerializedRequest = {
         desiredFrequency: (typeof studyFrequencyValues)[number];
         preferredTime: (typeof preferredTimeValues)[number];
         preferredFormat: (typeof formatValues)[number];
+      }
+    | {
+        type: "ACTIVITY";
+        title: string;
+        activitySubtype: (typeof activitySubtypeValues)[number];
+        time: string | null;
+        preferredFormat: (typeof formatValues)[number];
+        location: string | null;
+        peopleCount: number;
+        recurrence: (typeof studyFrequencyValues)[number];
+        comment: string | null;
       };
 };

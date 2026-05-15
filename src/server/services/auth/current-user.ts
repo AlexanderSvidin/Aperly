@@ -99,7 +99,7 @@ export async function requireAdminPageUser(options?: {
   const user = await requirePageUser(options);
 
   if (user.role !== "ADMIN") {
-    redirect("/home");
+    redirect("/opportunities");
   }
 
   return user;

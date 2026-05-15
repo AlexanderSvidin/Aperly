@@ -10,7 +10,7 @@ export default async function OnboardingPage() {
   });
 
   if (user.onboardingCompleted) {
-    redirect("/home");
+    redirect("/opportunities");
   }
 
   const editorData = await profileService.getEditorData(user.id);

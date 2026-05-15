@@ -1,4 +1,5 @@
 import type { RequestScenario } from "@/features/requests/lib/request-schema";
+import type { SerializedInteractionCtaState } from "@/features/connections/lib/connection-types";
 
 export type MatchModeValue = "REQUEST_TO_REQUEST" | "REQUEST_TO_PROFILE";
 export type MatchStatusValue =
@@ -70,6 +71,7 @@ export type SerializedMatchListItem = {
   candidateRequest: SerializedMatchRequestCard | null;
   chatReadiness: MatchChatReadiness;
   response: SerializedMatchResponse;
+  invitationState: SerializedInteractionCtaState;
   computedAt: string;
   expiresAt: string | null;
 };
@@ -90,7 +92,14 @@ export type SerializedRequestMatches = {
   requestId: string;
   requestTitle: string;
   requestScenario: RequestScenario;
-  requestStatus: "ACTIVE" | "EXPIRED" | "CLOSED" | "DELETED";
+  requestStatus:
+    | "DRAFT"
+    | "ACTIVE"
+    | "EXPIRED"
+    | "PAUSED"
+    | "CLOSED"
+    | "ARCHIVED"
+    | "DELETED";
   requestExpiresAt: string;
   lastMatchedAt: string | null;
   matches: SerializedMatchListItem[];
@@ -101,7 +110,14 @@ export type SerializedRequestMatches = {
 export type SerializedMatchRequestSummary = {
   id: string;
   scenario: RequestScenario;
-  status: "ACTIVE" | "EXPIRED" | "CLOSED" | "DELETED";
+  status:
+    | "DRAFT"
+    | "ACTIVE"
+    | "EXPIRED"
+    | "PAUSED"
+    | "CLOSED"
+    | "ARCHIVED"
+    | "DELETED";
   title: string;
   subtitle: string;
   expiresAt: string;

@@ -24,8 +24,15 @@ export type SerializedAdminUser = {
 export type SerializedAdminRequest = {
   id: string;
   title: string;
-  scenario: "CASE" | "PROJECT" | "STUDY";
-  status: "ACTIVE" | "EXPIRED" | "CLOSED" | "DELETED";
+  scenario: "CASE" | "PROJECT" | "STUDY" | "ACTIVITY";
+  status:
+    | "DRAFT"
+    | "ACTIVE"
+    | "EXPIRED"
+    | "PAUSED"
+    | "CLOSED"
+    | "ARCHIVED"
+    | "DELETED";
   ownerDisplayName: string;
   createdAt: string;
   expiresAt: string;

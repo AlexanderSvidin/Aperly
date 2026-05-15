@@ -36,6 +36,15 @@ enum ScenarioType {
   CASE
   PROJECT
   STUDY
+  ACTIVITY
+}
+
+enum ActivitySubtype {
+  CLUB
+  MEETING
+  SPORT
+  HOBBY
+  OTHER
 }
 
 enum CollaborationRole {
@@ -108,9 +117,12 @@ enum LanguageLevel {
 }
 
 enum RequestStatus {
+  DRAFT
   ACTIVE
   EXPIRED
+  PAUSED
   CLOSED
+  ARCHIVED
   DELETED
 }
 
@@ -176,6 +188,26 @@ enum AdminActionType {
   RESOLVE_REPORT
 }
 
+enum InteractionType {
+  RESPONSE
+  INVITATION
+}
+
+enum InteractionStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
+  ARCHIVED
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  ENDED
+  ARCHIVED
+}
+
 model User {
   id                   String        @id @default(uuid()) @db.Uuid
   telegramId           BigInt        @unique
@@ -206,6 +238,10 @@ model User {
   resolvedReports      Report[]      @relation("ReportResolvedByAdmin")
   adminActions         AdminAction[] @relation("AdminActionActor")
   targetedAdminActions AdminAction[] @relation("AdminActionTargetUser")
+  sentInteractions     Interaction[] @relation("InteractionSender")
+  receivedInteractions Interaction[] @relation("InteractionRecipient")
+  connectionsAsUserA   Connection[]  @relation("ConnectionUserA")
+  connectionsAsUserB   Connection[]  @relation("ConnectionUserB")
 
   @@index([role])
   @@index([status, blockedAt, deletedAt])
@@ -230,6 +266,8 @@ model Profile {
   user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   availabilitySlots     AvailabilitySlot[]  @relation("ProfileAvailability")
   fallbackMatches       Match[]             @relation("MatchTargetProfile")
+  targetInteractions    Interaction[]       @relation("InteractionTargetProfile")
+  targetConnections     Connection[]        @relation("ConnectionTargetProfile")
 
   @@index([isDiscoverable])
 }
@@ -320,9 +358,14 @@ model Request {
   caseDetails      CaseRequestDetails?
   projectDetails   ProjectRequestDetails?
   studyDetails     StudyRequestDetails?
+  activityDetails  ActivityRequestDetails?
   availabilitySlots AvailabilitySlot[]   @relation("RequestAvailability")
   sourceMatches    Match[]               @relation("MatchSourceRequest")
   candidateMatches Match[]               @relation("MatchTargetRequest")
+  sourceInteractions Interaction[]        @relation("InteractionSourceRequest")
+  targetInteractions Interaction[]        @relation("InteractionTargetRequest")
+  sourceConnections Connection[]          @relation("ConnectionSourceRequest")
+  targetConnections Connection[]          @relation("ConnectionTargetRequest")
   reports          Report[]
   adminActions     AdminAction[]         @relation("AdminActionRequest")
 
@@ -379,6 +422,24 @@ model StudyRequestDetails {
   @@index([subjectId, desiredFrequency])
 }
 
+model ActivityRequestDetails {
+  id              String           @id @default(uuid()) @db.Uuid
+  requestId       String           @unique @db.Uuid
+  title           String           @db.VarChar(160)
+  activitySubtype ActivitySubtype
+  time            DateTime?
+  preferredFormat FormatPreference
+  location        String?          @db.VarChar(160)
+  peopleCount     Int
+  recurrence      StudyFrequency
+  comment         String?          @db.Text
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  request         Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([activitySubtype, time])
+}
+
 model AvailabilitySlot {
   id         String    @id @default(uuid()) @db.Uuid
   profileId  String?   @db.Uuid
@@ -413,6 +474,8 @@ model Match {
   candidateRequest  Request?    @relation("MatchTargetRequest", fields: [candidateRequestId], references: [id], onDelete: Cascade)
   candidateProfile  Profile?    @relation("MatchTargetProfile", fields: [candidateProfileId], references: [id], onDelete: Cascade)
   chat              Chat?
+  interactions      Interaction[]
+  connections       Connection[]
   sessions          Session[]
   reports           Report[]
 
@@ -420,6 +483,68 @@ model Match {
   @@index([candidateRequestId])
   @@index([candidateProfileId])
   @@index([scenario, status, score])
+}
+
+model Interaction {
+  id              String            @id @default(uuid()) @db.Uuid
+  type            InteractionType
+  status          InteractionStatus @default(PENDING)
+  scenario        ScenarioType
+  matchId         String?           @db.Uuid
+  sourceRequestId String?           @db.Uuid
+  targetRequestId String?           @db.Uuid
+  targetProfileId String?           @db.Uuid
+  senderUserId    String            @db.Uuid
+  recipientUserId String            @db.Uuid
+  message         String            @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  decidedAt       DateTime?
+  expiresAt       DateTime?
+  archivedAt      DateTime?
+  match           Match?            @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  sourceRequest   Request?          @relation("InteractionSourceRequest", fields: [sourceRequestId], references: [id], onDelete: SetNull)
+  targetRequest   Request?          @relation("InteractionTargetRequest", fields: [targetRequestId], references: [id], onDelete: SetNull)
+  targetProfile   Profile?          @relation("InteractionTargetProfile", fields: [targetProfileId], references: [id], onDelete: SetNull)
+  sender          User              @relation("InteractionSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+  recipient       User              @relation("InteractionRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  connection      Connection?
+
+  @@index([senderUserId, status, createdAt])
+  @@index([recipientUserId, status, createdAt])
+  @@index([targetRequestId, status])
+  @@index([sourceRequestId, status])
+  @@index([matchId, status])
+}
+
+model Connection {
+  id              String           @id @default(uuid()) @db.Uuid
+  interactionId   String           @unique @db.Uuid
+  matchId         String?          @db.Uuid
+  scenario        ScenarioType
+  userAId         String           @db.Uuid
+  userBId         String           @db.Uuid
+  sourceRequestId String?          @db.Uuid
+  targetRequestId String?          @db.Uuid
+  targetProfileId String?          @db.Uuid
+  status          ConnectionStatus @default(ACTIVE)
+  telegramSharedAt DateTime        @default(now())
+  endedAt         DateTime?
+  archivedAt      DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  interaction     Interaction      @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  match           Match?           @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  userA           User             @relation("ConnectionUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB           User             @relation("ConnectionUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  sourceRequest   Request?         @relation("ConnectionSourceRequest", fields: [sourceRequestId], references: [id], onDelete: SetNull)
+  targetRequest   Request?         @relation("ConnectionTargetRequest", fields: [targetRequestId], references: [id], onDelete: SetNull)
+  targetProfile   Profile?         @relation("ConnectionTargetProfile", fields: [targetProfileId], references: [id], onDelete: SetNull)
+
+  @@index([userAId, status, createdAt])
+  @@index([userBId, status, createdAt])
+  @@index([scenario, status, createdAt])
+  @@index([matchId])
 }
 
 model Chat {

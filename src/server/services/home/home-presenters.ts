@@ -37,6 +37,10 @@ export function buildHomeRequestTitle(request: SerializedRequest) {
     return request.details.projectTitle;
   }
 
+  if (request.details.type === "ACTIVITY") {
+    return request.details.title;
+  }
+
   return request.details.subjectName;
 }
 
@@ -57,6 +61,14 @@ export function buildHomeRequestSubtitle(request: SerializedRequest) {
       request.details.expectedCommitment;
 
     return `${stageLabel} • ${commitmentLabel}`;
+  }
+
+  if (request.details.type === "ACTIVITY") {
+    const recurrenceLabel =
+      studyFrequencyLabelByValue[request.details.recurrence] ??
+      request.details.recurrence;
+
+    return `${recurrenceLabel} • ${request.details.peopleCount} чел.`;
   }
 
   const frequencyLabel =
@@ -120,7 +132,7 @@ export function buildHomeLatestMatches(
 export function buildHomePrimaryCta(): SerializedHomePrimaryCta {
   return {
     label: "Создать запрос",
-    href: "/requests/new",
+    href: "/create",
     action: "create_request"
   };
 }

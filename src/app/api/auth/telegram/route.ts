@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     const user = await telegramAuthService.authenticateWithTelegram(initData);
     const response = NextResponse.json({
-      redirectTo: user.onboardingCompleted ? "/home" : "/onboarding",
+      redirectTo: user.onboardingCompleted ? "/opportunities" : "/onboarding",
       user: serializeSessionUser(user)
     });
 

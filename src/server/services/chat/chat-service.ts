@@ -468,6 +468,14 @@ export class ChatDomainError extends Error {
   }
 }
 
+function throwLegacyChatDisabled(): never {
+  throw new ChatDomainError({
+    code: "legacy_chat_disabled",
+    message: "Legacy chat flow is disabled. Use connections flow.",
+    status: 410
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Service interface
 // ---------------------------------------------------------------------------
@@ -513,10 +521,10 @@ export const chatService: ChatService = {
   // openFromMatch
   // -------------------------------------------------------------------------
   async openFromMatch(userId, matchId, introMessage) {
-    const match = await prisma.match.findUnique({
+    const match = (await prisma.match.findUnique({
       where: { id: matchId },
       include: matchForOpenChatInclude
-    });
+    }))!;
 
     if (!match) {
       throw new ChatDomainError({
@@ -525,6 +533,8 @@ export const chatService: ChatService = {
         status: 404
       });
     }
+
+    return throwLegacyChatDisabled();
 
     // If a chat already exists for this match, return it directly.
     if (match.chat) {
@@ -539,7 +549,7 @@ export const chatService: ChatService = {
           status: 403
         });
       }
-      return { status: "CHAT_READY", chatId: match.chat.id };
+      return { status: "CHAT_READY", chatId: match.chat!.id };
     }
 
     // Guard against terminal match states.
@@ -647,10 +657,10 @@ export const chatService: ChatService = {
   // respondToFallbackInvite
   // -------------------------------------------------------------------------
   async respondToFallbackInvite(userId, matchId, decision) {
-    const match = await prisma.match.findUnique({
+    const match = (await prisma.match.findUnique({
       where: { id: matchId },
       include: matchForRespondInclude
-    });
+    }))!;
 
     if (!match) {
       throw new ChatDomainError({
@@ -660,7 +670,7 @@ export const chatService: ChatService = {
       });
     }
 
-    const storedResponse = readStoredResponse(match.reasonDetails);
+    const storedResponse = readStoredResponse(match.reasonDetails)!;
 
     if (!storedResponse || storedResponse.status !== "SENT") {
       throw new ChatDomainError({
@@ -669,6 +679,8 @@ export const chatService: ChatService = {
         status: 409
       });
     }
+
+    return throwLegacyChatDisabled();
 
     if (storedResponse.sentByUserId === userId) {
       throw new ChatDomainError({
@@ -706,7 +718,7 @@ export const chatService: ChatService = {
       if (decision === "ACCEPT") {
         return {
           status: "ACCEPTED",
-          chatId: match.chat.id,
+          chatId: match.chat!.id,
           ...acceptedContact
         };
       }
@@ -1146,6 +1158,8 @@ export const chatService: ChatService = {
 
     await assertChatAccess(chat, userId);
 
+    return throwLegacyChatDisabled();
+
     if (chat!.status === "CLOSED" || chat!.status === "BLOCKED") {
       throw new ChatDomainError({
         code: "chat_not_writable",
@@ -1221,6 +1235,8 @@ export const chatService: ChatService = {
     });
 
     await assertChatAccess(chat, userId);
+
+    return throwLegacyChatDisabled();
 
     if (chat!.contactExchangeStatus !== "REQUESTED_ONE_SIDED") {
       throw new ChatDomainError({

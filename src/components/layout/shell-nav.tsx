@@ -5,9 +5,9 @@ import type { Route } from "next";
 import { usePathname } from "next/navigation";
 
 const navItems: { href: Route; label: string; icon: string; primary?: boolean }[] = [
-  { href: "/home", label: "Главная", icon: "⌂" },
-  { href: "/requests/new", label: "Создать", icon: "+", primary: true },
-  { href: "/matches", label: "Отклики", icon: "◎" },
+  { href: "/opportunities", label: "Возможности", icon: "⌂" },
+  { href: "/create", label: "Создать", icon: "+", primary: true },
+  { href: "/connections", label: "Связи", icon: "◎" },
   { href: "/profile", label: "Профиль", icon: "○" }
 ];
 

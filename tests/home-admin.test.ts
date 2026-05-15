@@ -1,11 +1,14 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { after, test } from "node:test";
 
+import { legacyChatDisabledPayload } from "@/app/api/_legacy-disabled";
+import { POST as legacyOpenChatPost } from "@/app/api/matches/[id]/open-chat/route";
 import { prisma } from "@/server/db/client";
 import { validateTelegramInitData } from "@/server/services/auth/telegram-init-data";
 import { chatService } from "@/server/services/chat/chat-service";
+import { connectionService } from "@/server/services/connections/connection-service";
 import { getMatchUiStatus } from "@/features/matching/lib/match-options";
 import {
   buildHomeLatestMatches,
@@ -103,6 +106,23 @@ async function cleanupContext(context: TestContext) {
   await prisma.match.deleteMany({
     where: {
       id: { in: context.matchIds }
+    }
+  });
+
+  await prisma.connection.deleteMany({
+    where: {
+      OR: [{ userAId: { in: context.userIds } }, { userBId: { in: context.userIds } }]
+    }
+  });
+
+  await prisma.interaction.deleteMany({
+    where: {
+      OR: [
+        { senderUserId: { in: context.userIds } },
+        { recipientUserId: { in: context.userIds } },
+        { sourceRequestId: { in: context.requestIds } },
+        { targetRequestId: { in: context.requestIds } }
+      ]
     }
   });
 
@@ -234,6 +254,31 @@ async function createProjectRequest(context: TestContext, ownerId: string) {
   return request;
 }
 
+async function createActivityRequest(context: TestContext, ownerId: string) {
+  const request = await prisma.request.create({
+    data: {
+      ownerId,
+      scenario: "ACTIVITY",
+      status: "ACTIVE",
+      expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+      activityDetails: {
+        create: {
+          title: `${context.prefix} Activity`,
+          activitySubtype: "MEETING",
+          preferredFormat: "ONLINE",
+          peopleCount: 4,
+          recurrence: "WEEKLY",
+          comment: `${context.prefix} activity comment`
+        }
+      }
+    }
+  });
+
+  context.requestIds.push(request.id);
+
+  return request;
+}
+
 function buildSignedTelegramInitData(params: {
   botToken: string;
   authDate: number;
@@ -279,6 +324,16 @@ function buildEmptyMatchResponse() {
     telegramUsername: null,
     telegramUrl: null,
     contactHint: "Контакт откроется после принятия отклика."
+  };
+}
+
+function buildEmptyInvitationState() {
+  return {
+    status: "NONE" as const,
+    label: "Пригласить",
+    canAct: true,
+    interactionId: null,
+    connectionId: null
   };
 }
 
@@ -376,8 +431,8 @@ test("buildPublicMatchReasons returns deterministic human reasons", () => {
   );
 });
 
-test("chatService does not duplicate fallback invites", async () => {
-  const context = buildContext("duplicate_invite");
+test("legacy fallback chat invite flow is disabled", async () => {
+  const context = buildContext("legacy_invite_disabled");
 
   try {
     const owner = await createUser(context, { firstName: "InviteOwner" });
@@ -407,6 +462,19 @@ test("chatService does not duplicate fallback invites", async () => {
     });
     context.matchIds.push(match.id);
 
+    await assert.rejects(
+      () => chatService.openFromMatch(owner.id, match.id, "Legacy intro message"),
+      { code: "legacy_chat_disabled", status: 410 }
+    );
+    const disabledStoredMatch = await prisma.match.findUniqueOrThrow({
+      where: { id: match.id },
+      include: { chat: true }
+    });
+
+    assert.equal(disabledStoredMatch.status, "PENDING_RECIPIENT_ACCEPTANCE");
+    assert.equal(disabledStoredMatch.chat, null);
+    return;
+
     const firstResult = await chatService.openFromMatch(
       owner.id,
       match.id,
@@ -431,8 +499,8 @@ test("chatService does not duplicate fallback invites", async () => {
   }
 });
 
-test("response intro can be created and accepted without opening chat first", async () => {
-  const context = buildContext("intro_accept");
+test("legacy match response flow is disabled and does not create chat consent", async () => {
+  const context = buildContext("legacy_intro_disabled");
 
   try {
     const sender = await createUser(context, { firstName: "IntroSender" });
@@ -464,6 +532,25 @@ test("response intro can be created and accepted without opening chat first", as
     context.matchIds.push(match.id);
 
     const intro = "Я уже разбирал этот предмет и предлагаю созвониться на неделе.";
+    await assert.rejects(
+      () => chatService.openFromMatch(sender.id, match.id, intro),
+      { code: "legacy_chat_disabled", status: 410 }
+    );
+    const storedMatch = await prisma.match.findUniqueOrThrow({
+      where: { id: match.id },
+      select: { reasonDetails: true }
+    });
+    const disabledChatCount = await prisma.chat.count({
+      where: { matchId: match.id }
+    });
+
+    assert.equal(
+      Boolean((storedMatch.reasonDetails as { response?: unknown } | null)?.response),
+      false
+    );
+    assert.equal(disabledChatCount, 0);
+    return;
+
     const sent = await chatService.openFromMatch(sender.id, match.id, intro);
     const recipientMatches = await matchingService.listForOwnedRequest(
       recipient.id,
@@ -476,7 +563,7 @@ test("response intro can be created and accepted without opening chat first", as
     assert.equal(receivedMatch?.response.introMessage, intro);
     assert.equal(receivedMatch?.response.canAccept, true);
 
-    const accepted = await chatService.respondToFallbackInvite(
+    const accepted: any = await chatService.respondToFallbackInvite(
       recipient.id,
       match.id,
       "ACCEPT"
@@ -632,6 +719,7 @@ test("buildHomeLatestMatches sorts by recency first and score second", () => {
           candidateRequest: null,
           chatReadiness: "READY_FOR_CHAT",
           response: buildEmptyMatchResponse(),
+          invitationState: buildEmptyInvitationState(),
           computedAt: "2026-04-20T10:00:00.000Z",
           expiresAt: null
         },
@@ -659,6 +747,7 @@ test("buildHomeLatestMatches sorts by recency first and score second", () => {
           candidateRequest: null,
           chatReadiness: "INVITE_REQUIRED",
           response: buildEmptyMatchResponse(),
+          invitationState: buildEmptyInvitationState(),
           computedAt: "2026-04-21T10:00:00.000Z",
           expiresAt: null
         }
@@ -701,10 +790,14 @@ test("homeService feed excludes current user and inactive requests", async () =>
     assert.ok(feed.opportunities.some((item) => item.id === partnerRequest.id));
     assert.ok(!feed.opportunities.some((item) => item.id === ownRequest.id));
     assert.ok(!feed.opportunities.some((item) => item.id === inactiveRequest.id));
-    assert.equal(studyFeed.opportunities.length, 1);
+    assert.equal(
+      studyFeed.opportunities.filter((item) => item.id === partnerRequest.id).length,
+      1
+    );
     assert.equal(studyFeed.opportunities[0]?.scenario, "STUDY");
-    assert.equal(studyFeed.opportunities[0]?.ctaLabel, "Открыть отклики");
-    assert.equal(feed.primaryCta.href, "/requests/new");
+    assert.equal(studyFeed.opportunities[0]?.responseState.status, "NONE");
+    assert.equal(studyFeed.opportunities[0]?.responseState.canAct, true);
+    assert.equal(feed.primaryCta.href, "/create");
   } finally {
     await cleanupContext(context);
   }
@@ -1097,7 +1190,7 @@ test("requestService pauses, resumes, closes and archives requests", async () =>
     };
 
     const paused = await requestService.pause(actor, request.id);
-    assert.equal(paused.status, "EXPIRED");
+    assert.equal(paused.status, "PAUSED");
 
     const resumed = await requestService.renew(actor, request.id);
     assert.equal(resumed.status, "ACTIVE");
@@ -1107,12 +1200,12 @@ test("requestService pauses, resumes, closes and archives requests", async () =>
     assert.ok(closed.closedAt);
 
     const archived = await requestService.archive(actor, request.id);
-    assert.equal(archived.status, "DELETED");
+    assert.equal(archived.status, "ARCHIVED");
 
     const visibleRequests = await requestService.listForUser(owner.id);
     assert.equal(
       visibleRequests.some((visibleRequest) => visibleRequest.id === request.id),
-      false
+      true
     );
   } finally {
     await cleanupContext(context);
@@ -1155,8 +1248,174 @@ test("requestService returns validation errors for invalid StudyBuddy subjects",
   }
 });
 
-test("chatService decline keeps contacts hidden and writes decline message", async () => {
-  const context = buildContext("contact_decline");
+test("response lifecycle prevents duplicates and reveals Telegram only on active connection", async () => {
+  const context = buildContext("response_lifecycle");
+
+  try {
+    const owner = await createUser(context, { firstName: "ResponseOwner", username: "owner_contact" });
+    const responder = await createUser(context, { firstName: "ResponseSender", username: "sender_contact" });
+    const subject = await createSubject(context);
+    const request = await createStudyRequest(context, owner.id, subject.id);
+
+    const first = await connectionService.createResponseForRequest(
+      responder.id,
+      request.id,
+      "Хочу откликнуться и обсудить совместную учёбу."
+    );
+    const duplicate = await connectionService.createResponseForRequest(
+      responder.id,
+      request.id,
+      "Повторный отклик не должен создать дубль."
+    );
+    const interactionCount = await prisma.interaction.count({
+      where: { type: "RESPONSE", senderUserId: responder.id, targetRequestId: request.id }
+    });
+
+    assert.equal(first.status, "PENDING");
+    assert.equal(duplicate.id, first.id);
+    assert.equal(interactionCount, 1);
+
+    const accepted = await connectionService.respondToInteraction(owner.id, first.id, "ACCEPT");
+    assert.ok(accepted.connection?.id);
+
+    if (accepted.connection?.id) {
+      const list = await connectionService.listForUser(owner.id);
+      const summary = list.active.find((connection) => connection.id === accepted.connection?.id);
+      const detail = await connectionService.getConnectionForUser(owner.id, accepted.connection.id);
+
+      assert.equal(summary?.telegramUsername, null);
+      assert.equal(detail.status, "ACTIVE");
+      assert.equal(detail.telegramUsername, "sender_contact");
+
+      await prisma.request.update({
+        where: { id: request.id },
+        data: { status: "CLOSED", closedAt: new Date() }
+      });
+      const stillActive = await connectionService.getConnectionForUser(owner.id, accepted.connection.id);
+      assert.equal(stillActive.status, "ACTIVE");
+    }
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("declined response and invitation do not create connections", async () => {
+  const context = buildContext("decline_lifecycle");
+
+  try {
+    const owner = await createUser(context, { firstName: "DeclineOwner" });
+    const candidate = await createUser(context, { firstName: "DeclineCandidate" });
+    const subject = await createSubject(context);
+    const ownerRequest = await createStudyRequest(context, owner.id, subject.id);
+    const candidateRequest = await createStudyRequest(context, candidate.id, subject.id);
+
+    const response = await connectionService.createResponseForRequest(
+      candidate.id,
+      ownerRequest.id,
+      "Могу помочь с этим учебным запросом."
+    );
+    await connectionService.respondToInteraction(owner.id, response.id, "DECLINE");
+
+    const match = await prisma.match.create({
+      data: {
+        pairKey: `${context.prefix}_invite_pair`,
+        scenario: "STUDY",
+        mode: "REQUEST_TO_REQUEST",
+        status: "READY",
+        sourceRequestId: ownerRequest.id,
+        candidateRequestId: candidateRequest.id,
+        score: 80,
+        reasonSummary: `${context.prefix} invite reason`,
+        computedAt: new Date(),
+        expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+      }
+    });
+    context.matchIds.push(match.id);
+
+    const invitation = await connectionService.createInvitationFromMatch(
+      owner.id,
+      match.id,
+      "Приглашаю вас в мой учебный запрос."
+    );
+    const duplicate = await connectionService.createInvitationFromMatch(
+      owner.id,
+      match.id,
+      "Повторное приглашение не должно создать дубль."
+    );
+    await connectionService.respondToInteraction(candidate.id, invitation.id, "DECLINE");
+
+    const connectionCount = await prisma.connection.count({
+      where: {
+        OR: [
+          { interactionId: response.id },
+          { interactionId: invitation.id }
+        ]
+      }
+    });
+
+    assert.equal(duplicate.id, invitation.id);
+    assert.equal(connectionCount, 0);
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("closed request is hidden from opportunities and rejects new interactions", async () => {
+  const context = buildContext("closed_interactions");
+
+  try {
+    const owner = await createUser(context, { firstName: "ClosedOwner" });
+    const viewer = await createUser(context, { firstName: "ClosedViewer" });
+    const subject = await createSubject(context);
+    const request = await createStudyRequest(context, owner.id, subject.id);
+
+    await prisma.request.update({
+      where: { id: request.id },
+      data: { status: "CLOSED", closedAt: new Date() }
+    });
+
+    const feed = await homeService.getFeedForUser(viewer.id);
+
+    assert.ok(!feed.opportunities.some((item) => item.id === request.id));
+    await assert.rejects(
+      () =>
+        connectionService.createResponseForRequest(
+          viewer.id,
+          request.id,
+          "Хочу откликнуться на закрытый запрос."
+        ),
+      { code: "target_request_inactive", status: 409 }
+    );
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("activity request can be created and appears in opportunities", async () => {
+  const context = buildContext("activity_request");
+
+  try {
+    const owner = await createUser(context, { firstName: "ActivityOwner" });
+    const viewer = await createUser(context, { firstName: "ActivityViewer" });
+
+    await prisma.profile.updateMany({
+      where: { userId: { in: [owner.id, viewer.id] } },
+      data: { discoverableScenarios: ["STUDY", "PROJECT", "ACTIVITY"] }
+    });
+
+    const activity = await createActivityRequest(context, owner.id);
+    await matchingService.recomputeForRequest(activity.id);
+    const feed = await homeService.getFeedForUser(viewer.id, { scenario: "ACTIVITY" });
+
+    assert.ok(feed.opportunities.some((item) => item.id === activity.id));
+    assert.equal(feed.selectedScenario, "ACTIVITY");
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("legacy contact exchange flow is disabled and keeps contacts hidden", async () => {
+  const context = buildContext("contact_disabled");
 
   try {
     const owner = await createUser(context, { firstName: "ContactOwner" });
@@ -1192,6 +1451,26 @@ test("chatService decline keeps contacts hidden and writes decline message", asy
     });
     context.chatIds.push(chat.id);
 
+    await assert.rejects(
+      () => chatService.requestContactExchange(owner.id, chat.id),
+      { code: "legacy_chat_disabled", status: 410 }
+    );
+    const disabledStoredChat = await prisma.chat.findUniqueOrThrow({
+      where: { id: chat.id },
+      select: {
+        contactExchangeStatus: true,
+        contactSharedAt: true
+      }
+    });
+    const disabledMessageCount = await prisma.message.count({
+      where: { chatId: chat.id }
+    });
+
+    assert.equal(disabledStoredChat.contactExchangeStatus, "NOT_REQUESTED");
+    assert.equal(disabledStoredChat.contactSharedAt, null);
+    assert.equal(disabledMessageCount, 0);
+    return;
+
     await chatService.requestContactExchange(owner.id, chat.id);
     const result = await chatService.respondToContactExchange(
       partner.id,
@@ -1224,6 +1503,15 @@ test("chatService decline keeps contacts hidden and writes decline message", asy
   } finally {
     await cleanupContext(context);
   }
+});
+
+test("legacy chat endpoint returns 410 without contact data", async () => {
+  const response = await legacyOpenChatPost();
+  const payload = await response.json();
+
+  assert.equal(response.status, 410);
+  assert.deepEqual(payload, legacyChatDisabledPayload);
+  assert.equal(JSON.stringify(payload).includes("telegram"), false);
 });
 
 test("studySessionService supports first session, completion and repeat scheduling", async () => {

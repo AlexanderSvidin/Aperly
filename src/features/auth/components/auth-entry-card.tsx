@@ -111,7 +111,7 @@ export function AuthEntryCard() {
         return;
       }
 
-      window.location.assign(payload?.redirectTo ?? "/home");
+      window.location.assign(payload?.redirectTo ?? "/opportunities");
     });
   }
 

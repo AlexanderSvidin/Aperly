@@ -1,9 +1,11 @@
-import type { Prisma, ScenarioType } from "@prisma/client";
+﻿import type { Prisma, ScenarioType } from "@prisma/client";
 
 import type {
   SerializedHomeFeedData,
   SerializedHomeOpportunity
 } from "@/features/home/lib/home-types";
+import type { SerializedInteractionCtaState } from "@/features/connections/lib/connection-types";
+import { connectionService } from "@/server/services/connections/connection-service";
 import { buildHomePrimaryCta } from "@/server/services/home/home-presenters";
 import {
   collaborationRoleOptions,
@@ -18,7 +20,7 @@ import { prisma } from "@/server/db/client";
 
 const HOME_FEED_LIMIT = 30;
 
-const scenarioOrder: ScenarioType[] = ["STUDY", "PROJECT", "CASE"];
+const scenarioOrder: ScenarioType[] = ["STUDY", "PROJECT", "CASE", "ACTIVITY"];
 
 const collaborationRoleLabelByValue = Object.fromEntries(
   collaborationRoleOptions.map((option) => [option.value, option.label])
@@ -65,6 +67,7 @@ const opportunityInclude = {
   },
   caseDetails: true,
   projectDetails: true,
+  activityDetails: true,
   studyDetails: {
     include: {
       subject: true
@@ -156,6 +159,15 @@ function buildScenarioPayload(request: OpportunityRecord) {
     };
   }
 
+  if (request.scenario === "ACTIVITY" && request.activityDetails) {
+    return {
+      title: request.activityDetails.title,
+      goal: request.activityDetails.comment ?? "Ищут людей для активности",
+      meta: `${request.activityDetails.activitySubtype} • ${request.activityDetails.peopleCount} чел.`,
+      format: formatLabelByValue[request.activityDetails.preferredFormat] ?? null
+    };
+  }
+
   const frequency =
     studyFrequencyLabelByValue[
       request.studyDetails?.desiredFrequency ?? "FLEXIBLE"
@@ -192,10 +204,16 @@ function buildRelevanceReason(
 
 function serializeOpportunity(
   request: OpportunityRecord,
-  viewerActiveRequestByScenario: Map<ScenarioType, string>
+  viewerActiveRequestByScenario: Map<ScenarioType, string>,
+  responseState: SerializedInteractionCtaState = {
+    status: "NONE" as const,
+    label: "Откликнуться",
+    canAct: true,
+    interactionId: null,
+    connectionId: null
+  }
 ): SerializedHomeOpportunity {
   const scenarioPayload = buildScenarioPayload(request);
-  const activeViewerRequestId = viewerActiveRequestByScenario.get(request.scenario);
   const authorName = buildPersonDisplayName({
     fullName: request.owner.profile?.fullName,
     firstName: request.owner.firstName,
@@ -219,17 +237,18 @@ function serializeOpportunity(
       ? "Открытый профиль"
       : "Профиль скрыт",
     relevanceReason: buildRelevanceReason(request, viewerActiveRequestByScenario),
-    ctaLabel: activeViewerRequestId ? "Открыть отклики" : "Откликнуться",
-    ctaHref: activeViewerRequestId
-      ? `/matches?requestId=${activeViewerRequestId}`
-      : `/requests/new?scenario=${request.scenario}`,
+    responseState,
+    ctaLabel: responseState.label,
+    ctaHref: responseState.connectionId
+      ? `/connections/${responseState.connectionId}`
+      : `/opportunities/${request.id}`,
     expiresAt: request.expiresAt.toISOString(),
     updatedAt: request.updatedAt.toISOString()
   };
 }
 
 function resolveScenarioFilter(scenario: ScenarioType | "ALL" | undefined) {
-  if (scenario === "CASE" || scenario === "PROJECT" || scenario === "STUDY") {
+  if (scenario === "CASE" || scenario === "PROJECT" || scenario === "STUDY" || scenario === "ACTIVITY") {
     return scenario;
   }
 
@@ -307,8 +326,17 @@ export const homeService: HomeService = {
           )
         : opportunities;
 
+    const responseStateByRequest = await connectionService.getResponseStatesForRequests(
+      userId,
+      filteredOpportunities.map((request) => request.id)
+    );
+
     const serializedOpportunities = filteredOpportunities.map((request) =>
-      serializeOpportunity(request, viewerActiveRequestByScenario)
+      serializeOpportunity(
+        request,
+        viewerActiveRequestByScenario,
+        responseStateByRequest.get(request.id)
+      )
     );
 
     return {
@@ -323,3 +351,4 @@ export const homeService: HomeService = {
     };
   }
 };
+

@@ -22,7 +22,7 @@ export function buildEligibleRequestWhere(
 }
 
 export function buildDiscoverableFallbackProfileWhere(
-  scenario: "CASE" | "PROJECT" | "STUDY",
+  scenario: "CASE" | "PROJECT" | "STUDY" | "ACTIVITY",
   requestingUserId?: string,
   now = new Date()
 ): Prisma.ProfileWhereInput {

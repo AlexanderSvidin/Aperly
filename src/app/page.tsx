@@ -15,7 +15,7 @@ export default async function LandingPage() {
   }
 
   if (currentUser) {
-    redirect(currentUser.onboardingCompleted ? "/home" : "/onboarding");
+    redirect(currentUser.onboardingCompleted ? "/opportunities" : "/onboarding");
   }
 
   return <WelcomeScreen />;

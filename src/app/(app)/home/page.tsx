@@ -1,6 +1,4 @@
-import { HomeScreenShell } from "@/features/home/components/home-screen-shell";
-import { requirePageUser } from "@/server/services/auth/current-user";
-import { homeService } from "@/server/services/home/home-service";
+import { redirect } from "next/navigation";
 
 type HomePageProps = {
   searchParams?: Promise<{
@@ -9,35 +7,25 @@ type HomePageProps = {
   }>;
 };
 
-function resolveWelcomeFlag(value: string | string[] | undefined) {
-  const rawValue = Array.isArray(value) ? value[0] : value;
-
-  return rawValue === "1" || rawValue === "true";
-}
-
-function resolveScenarioFilter(value: string | string[] | undefined) {
-  const rawValue = Array.isArray(value) ? value[0] : value;
-
-  if (rawValue === "CASE" || rawValue === "PROJECT" || rawValue === "STUDY") {
-    return rawValue;
-  }
-
-  return "ALL";
+function readSingle(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-  const user = await requirePageUser();
   const resolvedSearchParams = await searchParams;
-  const initialData = await homeService.getFeedForUser(user.id, {
-    scenario: resolveScenarioFilter(resolvedSearchParams?.scenario)
-  });
+  const params = new URLSearchParams();
+  const scenario = readSingle(resolvedSearchParams?.scenario);
+  const welcome = readSingle(resolvedSearchParams?.welcome);
 
-  return (
-    <HomeScreenShell
-      initialData={initialData}
-      key={user.id}
-      showWelcomeSelector={resolveWelcomeFlag(resolvedSearchParams?.welcome)}
-      viewerName={user.profile?.fullName ?? user.firstName}
-    />
-  );
+  if (scenario) {
+    params.set("scenario", scenario);
+  }
+
+  if (welcome) {
+    params.set("welcome", welcome);
+  }
+
+  const query = params.toString();
+
+  redirect(query ? `/opportunities?${query}` : "/opportunities");
 }

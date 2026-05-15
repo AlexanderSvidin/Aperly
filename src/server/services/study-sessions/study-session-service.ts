@@ -869,7 +869,11 @@ export const studySessionService: StudySessionService = {
       });
     }
 
-    if (request.status === "CLOSED" || request.status === "DELETED") {
+    if (
+      request.status === "CLOSED" ||
+      request.status === "ARCHIVED" ||
+      request.status === "DELETED"
+    ) {
       throw new SessionDomainError({
         code: "request_already_closed",
         message: "Запрос уже закрыт.",

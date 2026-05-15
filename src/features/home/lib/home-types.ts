@@ -1,4 +1,5 @@
-import type { SerializedChatListItem } from "@/features/chat/lib/chat-types";
+﻿import type { SerializedChatListItem } from "@/features/chat/lib/chat-types";
+import type { SerializedInteractionCtaState } from "@/features/connections/lib/connection-types";
 import type {
   MatchChatReadiness,
   MatchStatusValue
@@ -12,7 +13,14 @@ import type {
 export type SerializedHomeRequestItem = {
   id: string;
   scenario: RequestScenario;
-  status: "ACTIVE" | "EXPIRED" | "CLOSED" | "DELETED";
+  status:
+    | "DRAFT"
+    | "ACTIVE"
+    | "EXPIRED"
+    | "PAUSED"
+    | "CLOSED"
+    | "ARCHIVED"
+    | "DELETED";
   title: string;
   subtitle: string;
   expiresAt: string;
@@ -35,7 +43,7 @@ export type SerializedHomeMatchItem = {
 
 export type SerializedHomePrimaryCta = {
   label: string;
-  href: "/requests/new";
+  href: "/create";
   action: "create_request";
 };
 
@@ -54,7 +62,8 @@ export type SerializedHomeOpportunity = {
   };
   trustInfo: string;
   relevanceReason: string;
-  ctaLabel: "Откликнуться" | "Открыть отклики";
+  responseState: SerializedInteractionCtaState;
+  ctaLabel: string;
   ctaHref: string;
   expiresAt: string;
   updatedAt: string;
@@ -75,3 +84,4 @@ export type SerializedHomeDashboardData = {
   studyContinuation: SerializedStudyContinuation | null;
   primaryCta: SerializedHomePrimaryCta;
 };
+

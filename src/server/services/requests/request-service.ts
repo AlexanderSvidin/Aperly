@@ -50,6 +50,7 @@ const requestInclude = {
   },
   caseDetails: true,
   projectDetails: true,
+  activityDetails: true,
   studyDetails: {
     include: {
       subject: true
@@ -77,6 +78,7 @@ type RequestMutationClient = Pick<
   | "availabilitySlot"
   | "caseRequestDetails"
   | "projectRequestDetails"
+  | "activityRequestDetails"
   | "request"
   | "subject"
   | "studyRequestDetails"
@@ -128,6 +130,18 @@ function serializeRequest(request: UserRequestRecord): SerializedRequest {
             expectedCommitment: request.projectDetails.expectedCommitment,
             preferredFormat: request.projectDetails.preferredFormat
           }
+        : request.activityDetails
+          ? {
+              type: "ACTIVITY",
+              title: request.activityDetails.title,
+              activitySubtype: request.activityDetails.activitySubtype,
+              time: request.activityDetails.time?.toISOString() ?? null,
+              preferredFormat: request.activityDetails.preferredFormat,
+              location: request.activityDetails.location,
+              peopleCount: request.activityDetails.peopleCount,
+              recurrence: request.activityDetails.recurrence,
+              comment: request.activityDetails.comment
+            }
         : {
             type: "STUDY",
             subjectId: request.studyDetails!.subjectId,
@@ -258,6 +272,11 @@ async function replaceScenarioDetails(
       where: {
         requestId
       }
+    }),
+    transaction.activityRequestDetails.deleteMany({
+      where: {
+        requestId
+      }
     })
   ]);
 
@@ -286,6 +305,24 @@ async function replaceScenarioDetails(
         neededRoles: input.details.neededRoles,
         expectedCommitment: input.details.expectedCommitment,
         preferredFormat: input.details.preferredFormat
+      }
+    });
+
+    return;
+  }
+
+  if (input.scenario === "ACTIVITY") {
+    await transaction.activityRequestDetails.create({
+      data: {
+        requestId,
+        title: input.details.title,
+        activitySubtype: input.details.activitySubtype,
+        time: input.details.time ? new Date(input.details.time) : null,
+        preferredFormat: input.details.preferredFormat,
+        location: input.details.location?.trim() || null,
+        peopleCount: input.details.peopleCount,
+        recurrence: input.details.recurrence,
+        comment: input.details.comment?.trim() || null
       }
     });
 
@@ -568,7 +605,7 @@ export const requestService: RequestService = {
         id: requestId
       },
       data: {
-        status: "EXPIRED"
+        status: "PAUSED"
       },
       include: requestInclude
     });
@@ -595,7 +632,10 @@ export const requestService: RequestService = {
       });
     }
 
-    if (existingRequest.status !== "EXPIRED") {
+    if (
+      existingRequest.status !== "PAUSED" &&
+      existingRequest.status !== "EXPIRED"
+    ) {
       throw new RequestDomainError({
         code: "request_not_resumable",
         message: "Р’РѕР·РѕР±РЅРѕРІРёС‚СЊ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ Р·Р°РїСЂРѕСЃ РЅР° РїР°СѓР·Рµ.",
@@ -651,7 +691,10 @@ export const requestService: RequestService = {
       return serialized;
     }
 
-    if (existingRequest.status === "DELETED") {
+    if (
+      existingRequest.status === "ARCHIVED" ||
+      existingRequest.status === "DELETED"
+    ) {
       throw new RequestDomainError({
         code: "request_archived",
         message: "РђСЂС…РёРІРЅС‹Р№ Р·Р°РїСЂРѕСЃ РЅРµР»СЊР·СЏ Р·Р°РєСЂС‹С‚СЊ.",
@@ -692,7 +735,10 @@ export const requestService: RequestService = {
       });
     }
 
-    if (existingRequest.status === "DELETED") {
+    if (
+      existingRequest.status === "ARCHIVED" ||
+      existingRequest.status === "DELETED"
+    ) {
       const serialized = serializeRequest(existingRequest);
       await trackRequestActionCompleted("archive", actor.id, serialized);
 
@@ -704,7 +750,7 @@ export const requestService: RequestService = {
         id: requestId
       },
       data: {
-        status: "DELETED",
+        status: "ARCHIVED",
         closedAt: new Date()
       },
       include: requestInclude
