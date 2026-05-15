@@ -1,30 +1,106 @@
+import Link from "next/link";
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 
-import { ProfileScreenShell } from "@/features/profile/components/profile-screen-shell";
+import { buttonClassName } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { DeleteProfilePanel } from "@/features/profile/components/delete-profile-panel";
+import {
+  collaborationRoleOptions,
+  requestStatusLabels
+} from "@/features/requests/lib/request-options";
 import type { SerializedRequest } from "@/features/requests/lib/request-schema";
+import { getProgramLabel } from "@/features/study/lib/study-catalog";
 import { requirePageUser } from "@/server/services/auth/current-user";
 import { profileService } from "@/server/services/profile/profile-service";
 import { requestService } from "@/server/services/requests/request-service";
+
+const roleLabelByValue = Object.fromEntries(
+  collaborationRoleOptions.map((option) => [option.value, option.label])
+) as Record<(typeof collaborationRoleOptions)[number]["value"], string>;
+
+function formatProgram(program: string | null | undefined) {
+  return getProgramLabel(program) ?? program ?? null;
+}
+
+function formatCourse(courseYear: number | null | undefined) {
+  return courseYear ? `${courseYear} курс` : "Курс не указан";
+}
+
+function collectRequestRoles(requests: SerializedRequest[]) {
+  const roles = requests.flatMap((request) => {
+    if (request.status !== "ACTIVE") {
+      return [];
+    }
+
+    if (request.details.type === "CASE" || request.details.type === "PROJECT") {
+      return request.details.neededRoles;
+    }
+
+    return [];
+  });
+
+  return [...new Set(roles)].map((role) => roleLabelByValue[role] ?? role);
+}
+
+function MenuLink({ href, label }: { href: Route; label: string }) {
+  return (
+    <Link className="profile-menu-row" href={href}>
+      <span>{label}</span>
+      <span aria-hidden="true">›</span>
+    </Link>
+  );
+}
+
+function ValueRow({
+  actionHref,
+  actionLabel,
+  label,
+  values
+}: {
+  actionHref?: Route;
+  actionLabel?: string;
+  label: string;
+  values: string[];
+}) {
+  return (
+    <div className="profile-value-row">
+      <p className="field-label">{label}</p>
+      {values.length > 0 ? (
+        <div className="chip-row">
+          {values.map((value) => (
+            <span className="info-chip" key={value}>
+              {value}
+            </span>
+          ))}
+        </div>
+      ) : actionHref && actionLabel ? (
+        <Link className="soft-cta-link" href={actionHref}>
+          {actionLabel}
+        </Link>
+      ) : (
+        <p className="helper-text">Пока не указано</p>
+      )}
+    </div>
+  );
+}
 
 export default async function ProfilePage() {
   const user = await requirePageUser();
 
   let editorData;
-  let archivedRequests: SerializedRequest[] = [];
+  let requests: SerializedRequest[] = [];
 
   try {
-    editorData = await profileService.getEditorData(user.id);
-    const requests = await requestService.listForUser(user.id);
-    archivedRequests = requests.filter((request) =>
-      ["CLOSED", "ARCHIVED", "DELETED", "EXPIRED"].includes(request.status)
-    );
+    [editorData, requests] = await Promise.all([
+      profileService.getEditorData(user.id),
+      requestService.listForUser(user.id)
+    ]);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Неизвестная ошибка";
-    console.error("[ProfilePage] getEditorData failed for user", user.id, "—", message);
+    console.error("[ProfilePage] load failed for user", user.id, "-", message);
 
-    // Return an inline stub instead of crashing the whole page.
-    // The error.tsx boundary is the next safety net if this component itself throws.
     return <ProfileLoadFailed />;
   }
 
@@ -32,15 +108,110 @@ export default async function ProfilePage() {
     redirect("/");
   }
 
+  const profile = user.profile;
+  const skillNameById = new Map(
+    editorData.lookups.skills.map((skill) => [skill.id, skill.name])
+  );
+  const subjectNameById = new Map(
+    editorData.lookups.subjects.map((subject) => [subject.id, subject.name])
+  );
+  const skillsCan = [
+    ...editorData.initialValues.skillIds
+      .map((skillId) => skillNameById.get(skillId))
+      .filter(Boolean),
+    ...editorData.initialValues.customSkillNames
+  ] as string[];
+  const skillsWant = [
+    ...editorData.initialValues.subjectIds
+      .map((subjectId) => subjectNameById.get(subjectId))
+      .filter(Boolean),
+    ...editorData.initialValues.customSubjectNames
+  ] as string[];
+  const roles = collectRequestRoles(requests);
+  const displayName = profile?.fullName ?? editorData.initialValues.fullName;
+  const program = formatProgram(profile?.program);
+
   return (
-    <ProfileScreenShell
-      initialValues={editorData.initialValues}
-      archivedRequests={archivedRequests}
-      key={user.id}
-      lookups={editorData.lookups}
-      mode="edit"
-      viewer={editorData.viewer}
-    />
+    <section className="screen-stack">
+      <section className="surface-card screen-stack">
+        <div className="screen-copy">
+          <p className="card-eyebrow">Aperly | Профиль</p>
+          <h1 className="screen-title">Профиль</h1>
+        </div>
+      </section>
+
+      <section className="surface-card screen-stack">
+        <div className="screen-copy">
+          <p className="card-eyebrow">Карточка</p>
+          <h2 className="screen-title">{displayName || "Студент HSE Perm"}</h2>
+          <p className="screen-description">
+            {[profile?.campus ?? "Вуз не указан", formatCourse(profile?.courseYear)]
+              .filter(Boolean)
+              .join(", ")}
+          </p>
+          <p className="card-body-copy">
+            {program ? program : "Направление или программа не указаны"}
+          </p>
+        </div>
+
+        <Link className={buttonClassName({ fullWidth: true })} href="/profile/edit">
+          Редактировать
+        </Link>
+      </section>
+
+      <section className="surface-card screen-stack">
+        <div className="screen-copy">
+          <p className="card-eyebrow">Для подбора</p>
+          <h2 className="card-title">Что помогает находить людей</h2>
+        </div>
+
+        <ValueRow
+          actionHref="/profile/edit/skills"
+          actionLabel="Добавить навыки"
+          label="Умею"
+          values={skillsCan}
+        />
+        <ValueRow
+          actionHref="/profile/edit/skills"
+          actionLabel="Добавить интересы"
+          label="Хочу"
+          values={skillsWant}
+        />
+        <ValueRow
+          actionHref="/profile/edit/roles"
+          actionLabel="Добавить роли"
+          label="Роли"
+          values={roles.length > 0 ? [roles[0]!, ...roles.slice(1)] : []}
+        />
+      </section>
+
+      <section className="surface-card screen-stack">
+        <div className="screen-copy">
+          <p className="card-eyebrow">Меню</p>
+          <h2 className="card-title">Настройки и история</h2>
+        </div>
+
+        <div className="profile-menu-list">
+          <MenuLink href="/profile/requests" label="Мои запросы" />
+          <MenuLink href="/profile/archive" label="Архив" />
+          <MenuLink href="/profile/edit/telegram" label="Telegram-контакт" />
+          <a className="profile-menu-row" href="#delete-account">
+            <span>Удалить аккаунт</span>
+            <span aria-hidden="true">›</span>
+          </a>
+        </div>
+      </section>
+
+      <div id="delete-account">
+        <DeleteProfilePanel />
+      </div>
+
+      <p className="helper-text">
+        Активных запросов:{" "}
+        {requests.filter((request) => request.status === "ACTIVE").length}.{" "}
+        {requestStatusLabels.ACTIVE}
+      </p>
+    </section>
   );
 }
 
@@ -48,18 +219,12 @@ function ProfileLoadFailed() {
   return (
     <section className="screen-stack">
       <div className="surface-card screen-stack">
-        <div className="card-header">
-          <p className="card-eyebrow">Профиль</p>
-          <h1 className="card-title">Не удалось загрузить данные</h1>
-        </div>
-        <p className="card-body-copy">
-          Информация профиля временно недоступна. Скорее всего, это сбой базы
-          данных или сетевая проблема. Попробуйте зайти снова через несколько
-          секунд.
-        </p>
-        <a className="button button-primary button-full" href="/profile">
-          Обновить страницу
-        </a>
+        <EmptyState
+          actionHref="/profile"
+          actionLabel="Повторить"
+          title="Не удалось загрузить данные"
+          text="Проверьте интернет и попробуйте снова."
+        />
       </div>
     </section>
   );

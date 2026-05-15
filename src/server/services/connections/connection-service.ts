@@ -11,8 +11,8 @@ import type {
 import { prisma } from "@/server/db/client";
 import { analyticsService } from "@/server/services/analytics/analytics-service";
 
-const INTERACTION_MESSAGE_MAX_LENGTH = 700;
-const INTERACTION_MESSAGE_MIN_LENGTH = 10;
+const DEFAULT_INTERACTION_MESSAGE = "Привет! Мне интересно подключиться.";
+const INTERACTION_MESSAGE_MAX_LENGTH = 300;
 
 const userNameSelect = {
   id: true,
@@ -165,15 +165,7 @@ type MatchForInvitation = Prisma.MatchGetPayload<{
 }>;
 
 function normalizeMessage(value: string | null | undefined) {
-  const message = value?.trim() ?? "";
-
-  if (message.length < INTERACTION_MESSAGE_MIN_LENGTH) {
-    throw new ConnectionDomainError({
-      code: "interaction_message_too_short",
-      message: "Коротко напишите, почему хотите связаться.",
-      status: 422
-    });
-  }
+  const message = value?.trim() || DEFAULT_INTERACTION_MESSAGE;
 
   if (message.length > INTERACTION_MESSAGE_MAX_LENGTH) {
     throw new ConnectionDomainError({

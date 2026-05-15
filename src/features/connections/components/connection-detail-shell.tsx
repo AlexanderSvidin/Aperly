@@ -88,29 +88,29 @@ export function ConnectionDetailShell({
         <div className="screen-copy">
           <p className="card-eyebrow">Telegram handoff</p>
           <h2 className="card-title">
-            {connection.canOpenTelegram
-              ? "Можно перейти в Telegram"
-              : "Связь уже не активна"}
+            {connection.canOpenTelegram && connection.telegramUrl
+              ? "Написать в Telegram"
+              : connection.canOpenTelegram
+                ? "Username не найден"
+                : "Связь уже не активна"}
           </h2>
           <p className="card-body-copy">
-            {connection.canOpenTelegram
-              ? "Взаимное согласие получено, поэтому контакт теперь открыт."
-              : "Контакт был доступен только в активной связи."}
+            {connection.canOpenTelegram && connection.telegramUrl
+              ? "Откроем личный чат в Telegram."
+              : connection.canOpenTelegram
+                ? "Чтобы открыть личный чат, пользователю нужен username в Telegram."
+                : "Контакт был доступен только в активной связи."}
           </p>
         </div>
 
-        {connection.canOpenTelegram && connection.telegramUsername ? (
-          <div className="feedback-box success-box">
-            <p className="feedback-title">@{connection.telegramUsername}</p>
-          </div>
-        ) : (
+        {connection.canOpenTelegram && !connection.telegramUrl ? (
           <div className="feedback-box">
-            <p className="feedback-title">Telegram username не указан.</p>
+            <p className="feedback-title">Username не найден</p>
             <p className="helper-text">
-              Связь активна, но у второго пользователя нет username в профиле.
+              Чтобы открыть личный чат, пользователю нужен username в Telegram.
             </p>
           </div>
-        )}
+        ) : null}
 
         {actionState.status !== "idle" ? (
           <div
@@ -132,8 +132,16 @@ export function ConnectionDetailShell({
               rel="noreferrer"
               target="_blank"
             >
-              Открыть Telegram
+              Написать в Telegram
             </a>
+          ) : null}
+          {connection.canOpenTelegram && !connection.telegramUrl ? (
+            <Link
+              className={buttonClassName({ variant: "secondary" })}
+              href="/connections"
+            >
+              Понятно
+            </Link>
           ) : null}
           {connection.canEnd ? (
             <Button

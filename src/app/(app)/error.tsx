@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default function AppError({
   error,
@@ -18,19 +18,15 @@ export default function AppError({
   return (
     <section className="screen-stack">
       <div className="surface-card screen-stack">
-        <div className="card-header">
-          <p className="card-eyebrow">Ошибка</p>
-          <h2 className="card-title">Что-то пошло не так</h2>
-        </div>
-        <p className="card-body-copy">
-          Страница временно недоступна. Обычно это решается простым обновлением.
-        </p>
+        <EmptyState
+          actionLabel="Повторить"
+          onAction={reset}
+          title="Не удалось загрузить данные"
+          text="Проверьте интернет и попробуйте снова."
+        />
         {error.digest ? (
           <p className="helper-text">Код: {error.digest}</p>
         ) : null}
-        <Button fullWidth onClick={reset} type="button" variant="primary">
-          Обновить страницу
-        </Button>
       </div>
     </section>
   );

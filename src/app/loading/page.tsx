@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -24,7 +24,7 @@ export default function LoadingPage() {
   const [error, setError] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
 
-  async function checkSession() {
+  const checkSession = useCallback(async () => {
     setError(null);
     setIsRetrying(true);
 
@@ -59,11 +59,15 @@ export default function LoadingPage() {
     } finally {
       setIsRetrying(false);
     }
-  }
+  }, [router]);
 
   useEffect(() => {
-    void checkSession();
-  }, []);
+    const timer = window.setTimeout(() => {
+      void checkSession();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [checkSession]);
 
   return (
     <main className="welcome-layout">

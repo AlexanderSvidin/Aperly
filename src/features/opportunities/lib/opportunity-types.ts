@@ -27,6 +27,8 @@ export type SerializedOpportunityDetail = {
     subjects: string[];
   };
   canRespond: boolean;
+  isOwnRequest: boolean;
+  isAvailable: boolean;
   responseState: SerializedInteractionCtaState;
   expiresAt: string;
 };

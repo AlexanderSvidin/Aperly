@@ -7,15 +7,15 @@ import type { Route } from "next";
 import { useRouter } from "next/navigation";
 
 import { Button, buttonClassName } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import type {
   SerializedHomeFeedData,
   SerializedHomeOpportunity
 } from "@/features/home/lib/home-types";
+import { RespondSheet } from "@/features/opportunities/components/respond-sheet";
 import { scenarioLabelByValue } from "@/features/matching/lib/match-options";
 import { formatRequestDate } from "@/features/requests/lib/request-options";
 import type { RequestScenario } from "@/features/requests/lib/request-schema";
-import type { ActionState } from "@/lib/ui/action-state";
-import { idleActionState, isActionLoading } from "@/lib/ui/action-state";
 
 type HomeScreenShellProps = {
   initialData: SerializedHomeFeedData;
@@ -28,8 +28,8 @@ type FeedFilter = RequestScenario | "ALL";
 const feedTabs: { value: FeedFilter; label: string }[] = [
   { value: "ALL", label: "Все" },
   { value: "STUDY", label: "Учёба" },
-  { value: "PROJECT", label: "Проекты" },
-  { value: "CASE", label: "Кейсы" },
+  { value: "CASE", label: "Команда" },
+  { value: "PROJECT", label: "Проект" },
   { value: "ACTIVITY", label: "Активность" }
 ];
 
@@ -59,9 +59,9 @@ export function HomeScreenShell({
   const [activeFilter, setActiveFilter] = useState<FeedFilter>(
     initialData.selectedScenario
   );
-  const [actionStates, setActionStates] = useState<Record<string, ActionState>>(
-    {}
-  );
+  const [selectedOpportunity, setSelectedOpportunity] =
+    useState<SerializedHomeOpportunity | null>(null);
+  const [respondedRequestIds, setRespondedRequestIds] = useState<string[]>([]);
 
   const visibleOpportunities = useMemo(
     () =>
@@ -76,68 +76,23 @@ export function HomeScreenShell({
   const preferredScenario =
     activeFilter === "ALL" ? undefined : activeFilter;
 
-  function getActionState(requestId: string) {
-    return actionStates[requestId] ?? idleActionState;
-  }
-
-  function respondFromCard(opportunity: SerializedHomeOpportunity) {
-    if (opportunity.responseState.status !== "NONE") {
-      return;
-    }
-
-    void (async () => {
-      setActionStates((current) => ({
-        ...current,
-        [opportunity.id]: {
-          status: "loading",
-          message: "Отправляем отклик..."
-        }
-      }));
-
-      const response = await fetch(`/api/opportunities/${opportunity.id}/responses`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: `Хочу откликнуться на запрос: ${opportunity.title}.`
-        })
-      });
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            message?: string;
-          }
-        | null;
-
-      setActionStates((current) => ({
-        ...current,
-        [opportunity.id]: response.ok
-          ? {
-              status: "success",
-              message: "Отклик отправлен. Ждём ответ."
-            }
-          : {
-              status: "error",
-              message: payload?.message ?? "Не удалось отправить отклик."
-            }
-      }));
-
-      if (response.ok) {
-        router.refresh();
-      }
-    })();
+  function handleRespondSuccess(requestId: string) {
+    setRespondedRequestIds((current) =>
+      current.includes(requestId) ? current : [...current, requestId]
+    );
+    router.refresh();
   }
 
   return (
     <section className="screen-stack">
       <section className="surface-card screen-stack">
         <div className="screen-copy">
-          <p className="card-eyebrow">Главная</p>
-          <h1 className="screen-title">Открытые возможности</h1>
+          <p className="card-eyebrow">Aperly | Возможности</p>
+          <h1 className="screen-title">Возможности</h1>
           <p className="screen-description">
             {showWelcomeSelector
-              ? `Привет, ${viewerName}. Посмотрите, кто уже ищет команду, проектного партнёра или StudyBuddy.`
-              : "Здесь видны активные запросы других студентов. Чтобы откликнуться, создайте свой запрос в похожем сценарии."}
+              ? `Привет, ${viewerName}. Открытые запросы студентов уже здесь.`
+              : "Открытые запросы студентов"}
           </p>
         </div>
 
@@ -160,30 +115,30 @@ export function HomeScreenShell({
 
       {visibleOpportunities.length === 0 ? (
         <section className="surface-card screen-stack">
-          <div className="screen-copy">
-            <p className="card-eyebrow">Пока тихо</p>
-            <h2 className="card-title">Нет открытых запросов</h2>
-            <p className="card-body-copy">
-              Пока нет открытых запросов. Создайте свой — и другие смогут
-              откликнуться.
-            </p>
-          </div>
-          <Link
-            className={buttonClassName({ fullWidth: true })}
-            href={buildCreateHref(preferredScenario)}
-          >
-            Создать запрос
-          </Link>
+          <EmptyState
+            actionHref={buildCreateHref(preferredScenario)}
+            actionLabel="Создать запрос"
+            title="Пока нет открытых возможностей"
+            text="Создайте свой запрос или вернитесь позже."
+          />
         </section>
       ) : (
         <div className="opportunity-list">
           {visibleOpportunities.map((opportunity) => {
-            const actionState = getActionState(opportunity.id);
-            const isBusy = isActionLoading(actionState);
+            const hasJustResponded = respondedRequestIds.includes(opportunity.id);
+            const isRespondable =
+              opportunity.responseState.status === "NONE" && !hasJustResponded;
+            const statusLabel = hasJustResponded
+              ? "Ждём ответ"
+              : opportunity.responseState.label;
 
             return (
             <article key={opportunity.id} className="opportunity-card">
-              <div className="opportunity-card-main">
+              <Link
+                aria-label={`Открыть запрос ${opportunity.title}`}
+                className="opportunity-card-main"
+                href={buildOpportunityHref(opportunity)}
+              >
                 <div className="match-badge-row">
                   <span className="status-pill">
                     {scenarioLabelByValue[opportunity.scenario]}
@@ -217,26 +172,12 @@ export function HomeScreenShell({
                 <p className="helper-text">
                   Активно до {formatRequestDate(opportunity.expiresAt)}
                 </p>
-              </div>
+              </Link>
 
-              {actionState.status !== "idle" ? (
-                <div
-                  className={
-                    actionState.status === "error"
-                      ? "feedback-box error-box"
-                      : "feedback-box success-box"
-                  }
-                >
-                  <p className="feedback-title">{actionState.message}</p>
-                </div>
-              ) : null}
-              {opportunity.responseState.status === "NONE" ? (
+              {isRespondable ? (
                 <Button
-                  disabled={isBusy}
                   fullWidth
-                  isLoading={isBusy}
-                  loadingLabel="Отправляем..."
-                  onClick={() => respondFromCard(opportunity)}
+                  onClick={() => setSelectedOpportunity(opportunity)}
                 >
                   {opportunity.responseState.label}
                 </Button>
@@ -249,20 +190,31 @@ export function HomeScreenShell({
                 </Link>
               ) : (
                 <Button disabled fullWidth variant="secondary">
-                  {opportunity.responseState.label}
+                  {statusLabel}
                 </Button>
               )}
-              <Link
-                className={buttonClassName({ fullWidth: true })}
-                href={buildOpportunityHref(opportunity)}
-              >
-                Открыть запрос
-              </Link>
             </article>
             );
           })}
         </div>
       )}
+      <RespondSheet
+        isOpen={Boolean(selectedOpportunity)}
+        onClose={() => setSelectedOpportunity(null)}
+        onSuccess={handleRespondSuccess}
+        request={
+          selectedOpportunity
+            ? {
+                id: selectedOpportunity.id,
+                type: scenarioLabelByValue[selectedOpportunity.scenario],
+                title: selectedOpportunity.title,
+                meta: selectedOpportunity.meta,
+                format: selectedOpportunity.format,
+                time: selectedOpportunity.time
+              }
+            : null
+        }
+      />
     </section>
   );
 }

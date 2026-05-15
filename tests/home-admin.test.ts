@@ -8,6 +8,8 @@ import { POST as legacyOpenChatPost } from "@/app/api/matches/[id]/open-chat/rou
 import { prisma } from "@/server/db/client";
 import { validateTelegramInitData } from "@/server/services/auth/telegram-init-data";
 import { chatService } from "@/server/services/chat/chat-service";
+import type { RespondResult } from "@/features/chat/lib/chat-types";
+import { archiveService } from "@/server/services/archive/archive-service";
 import { connectionService } from "@/server/services/connections/connection-service";
 import { getMatchUiStatus } from "@/features/matching/lib/match-options";
 import {
@@ -563,11 +565,11 @@ test("legacy match response flow is disabled and does not create chat consent", 
     assert.equal(receivedMatch?.response.introMessage, intro);
     assert.equal(receivedMatch?.response.canAccept, true);
 
-    const accepted: any = await chatService.respondToFallbackInvite(
+    const accepted = (await chatService.respondToFallbackInvite(
       recipient.id,
       match.id,
       "ACCEPT"
-    );
+    )) as Extract<RespondResult, { status: "ACCEPTED" }>;
     assert.equal(accepted.status, "ACCEPTED");
     if (accepted.status === "ACCEPTED") {
       context.chatIds.push(accepted.chatId);
@@ -1355,6 +1357,63 @@ test("declined response and invitation do not create connections", async () => {
 
     assert.equal(duplicate.id, invitation.id);
     assert.equal(connectionCount, 0);
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("archiveService returns ended connections, closed requests and declined interactions", async () => {
+  const context = buildContext("archive_contract");
+
+  try {
+    const owner = await createUser(context, { firstName: "ArchiveContractOwner" });
+    const candidate = await createUser(context, {
+      firstName: "ArchiveContractCandidate"
+    });
+    const subject = await createSubject(context);
+    const ownerRequest = await createStudyRequest(context, owner.id, subject.id);
+    const candidateRequest = await createStudyRequest(context, candidate.id, subject.id);
+    const actor = {
+      id: owner.id,
+      status: "ACTIVE" as const,
+      onboardingCompleted: true
+    };
+
+    const declined = await connectionService.createResponseForRequest(
+      candidate.id,
+      ownerRequest.id,
+      "Готов обсудить этот учебный запрос."
+    );
+    await connectionService.respondToInteraction(owner.id, declined.id, "DECLINE");
+
+    const accepted = await connectionService.createResponseForRequest(
+      owner.id,
+      candidateRequest.id,
+      "Готов подключиться к вашему учебному запросу."
+    );
+    const acceptedResult = await connectionService.respondToInteraction(
+      candidate.id,
+      accepted.id,
+      "ACCEPT"
+    );
+
+    assert.ok(acceptedResult.connection?.id);
+
+    if (acceptedResult.connection?.id) {
+      await connectionService.endConnection(owner.id, acceptedResult.connection.id);
+    }
+
+    await requestService.close(actor, ownerRequest.id);
+
+    const archive = await archiveService.getForUser(owner.id);
+
+    assert.ok(
+      archive.connections.some(
+        (connection) => connection.id === acceptedResult.connection?.id
+      )
+    );
+    assert.ok(archive.requests.some((request) => request.id === ownerRequest.id));
+    assert.ok(archive.declined.some((interaction) => interaction.id === declined.id));
   } finally {
     await cleanupContext(context);
   }

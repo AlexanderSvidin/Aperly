@@ -18,7 +18,13 @@ type RouteProps = {
 };
 
 const responseBodySchema = z.object({
-  message: z.string().trim().min(10).max(700)
+  message: z
+    .string()
+    .trim()
+    .max(300)
+    .optional()
+    .nullable()
+    .transform((value) => value || "Привет! Мне интересно подключиться.")
 });
 
 function buildErrorResponse(error: unknown) {
@@ -58,7 +64,7 @@ export async function POST(request: Request, { params }: RouteProps) {
     if (!parsed.success) {
       return NextResponse.json(
         {
-          message: "Коротко напишите, почему хотите откликнуться.",
+          message: "Сообщение должно быть не длиннее 300 символов.",
           errors: parsed.error.flatten()
         },
         {

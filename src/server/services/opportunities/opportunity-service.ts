@@ -171,6 +171,8 @@ function serializeOpportunityDetail(
       isActive &&
       request.ownerId !== viewerUserId &&
       responseState.status === "NONE",
+    isOwnRequest: request.ownerId === viewerUserId,
+    isAvailable: isActive,
     responseState,
     expiresAt: request.expiresAt.toISOString()
   };

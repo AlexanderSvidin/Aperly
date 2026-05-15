@@ -5,7 +5,9 @@ import nextTypescript from "eslint-config-next/typescript";
 export default defineConfig([
   globalIgnores([
     "*.config.mjs",
+    ".claude/**",
     ".next/**",
+    "**/.next/**",
     "out/**",
     "build/**",
     "coverage/**",

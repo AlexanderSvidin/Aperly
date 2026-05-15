@@ -68,6 +68,42 @@ const studyLevelValues = studyLevelOptions.map((option) => option.value) as [
 ];
 const allowedProgramIds = new Set(studyProgramOptions.map((program) => program.id));
 
+export const onboardingProfileInputSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(160),
+    institution: z.string().trim().min(2).max(160),
+    programType: z.enum(studyLevelValues),
+    direction: z.string().trim().min(2).max(160),
+    program: z
+      .string()
+      .trim()
+      .max(160)
+      .optional()
+      .nullable()
+      .transform((value) => value || null),
+    courseYear: z.number().int().min(1).max(6)
+  })
+  .superRefine((value, context) => {
+    if (value.programType === "MASTER" && value.courseYear > 2) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["courseYear"],
+        message: "Для магистратуры доступны 1 и 2 курс."
+      });
+    }
+  })
+  .transform((value) => ({
+    ...value,
+    fullName: value.fullName.trim(),
+    institution: value.institution.trim(),
+    direction: value.direction.trim(),
+    program: value.program?.trim() || null
+  }));
+
+export type OnboardingProfileInput = z.infer<
+  typeof onboardingProfileInputSchema
+>;
+
 export const profileInputSchema = z
   .object({
     fullName: z.string().trim().min(2).max(160),

@@ -1,4 +1,4 @@
-import { MatchesScreenShell } from "@/features/matching/components/matches-screen-shell";
+import { RequestMatchesScreen } from "@/features/matching/components/request-matches-screen";
 import { requirePageUser } from "@/server/services/auth/current-user";
 import { matchingService } from "@/server/services/matching/matching-service";
 
@@ -29,7 +29,7 @@ export default async function RequestMatchesPage({
   });
 
   return (
-    <MatchesScreenShell
+    <RequestMatchesScreen
       creationNotice={readSingleSearchParam(resolvedSearchParams?.created) === "1"}
       initialData={initialData}
       key={user.id}

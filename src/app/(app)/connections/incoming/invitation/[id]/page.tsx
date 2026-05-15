@@ -18,9 +18,10 @@ export default async function IncomingInvitationPage({
 }: IncomingInvitationPageProps) {
   const user = await requirePageUser();
   const resolvedParams = await params;
+  let interaction;
 
   try {
-    const interaction = await connectionService.getInteractionForUser(
+    interaction = await connectionService.getInteractionForUser(
       user.id,
       resolvedParams.id
     );
@@ -28,8 +29,6 @@ export default async function IncomingInvitationPage({
     if (interaction.type !== "INVITATION") {
       notFound();
     }
-
-    return <IncomingInteractionShell interaction={interaction} key={user.id} />;
   } catch (error) {
     if (error instanceof ConnectionDomainError && error.status === 404) {
       notFound();
@@ -37,4 +36,6 @@ export default async function IncomingInvitationPage({
 
     throw error;
   }
+
+  return <IncomingInteractionShell interaction={interaction} key={user.id} />;
 }

@@ -587,9 +587,72 @@ select {
   padding: 14px 16px;
 }
 
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.empty-state-icon {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-small);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 900;
+}
+
 .feedback-title {
   margin: 0;
   font-weight: 700;
+}
+
+.bottom-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(13, 18, 38, 0.42);
+  padding: 18px;
+  z-index: 60;
+}
+
+.bottom-sheet {
+  display: flex;
+  width: min(100%, var(--max-content-width));
+  max-height: calc(100vh - 42px);
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  border: 1px solid var(--surface-border);
+  border-radius: 24px 24px 16px 16px;
+  background: #ffffff;
+  box-shadow: 0 -18px 54px rgba(22, 27, 58, 0.22);
+  padding: 12px 18px 18px;
+}
+
+.confirm-modal {
+  display: flex;
+  width: min(100%, 420px);
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-medium);
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(22, 27, 58, 0.24);
+  padding: 20px;
+}
+
+.sheet-handle {
+  width: 42px;
+  height: 4px;
+  align-self: center;
+  border-radius: 999px;
+  background: rgba(74, 74, 106, 0.28);
 }
 
 .error-box {
@@ -708,6 +771,33 @@ select {
   gap: 10px;
   align-items: center;
   justify-content: space-between;
+}
+
+.profile-menu-list,
+.profile-value-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-menu-row {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid rgba(216, 210, 194, 0.84);
+  border-radius: var(--radius-small);
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--tg-text-color);
+  font-weight: 800;
+  padding: 0 14px;
+}
+
+.soft-cta-link {
+  width: fit-content;
+  color: var(--accent);
+  font-weight: 800;
 }
 
 .request-selector-grid,

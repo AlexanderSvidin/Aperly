@@ -1,5 +1,6 @@
 import { prisma } from "@/server/db/client";
 import {
+  onboardingProfileInputSchema,
   profileInputSchema,
   type ProfileDraft
 } from "@/features/profile/lib/profile-schema";
@@ -185,6 +186,83 @@ export const profileService = {
         onboardingCompleted: user.onboardingCompleted
       }
     };
+  },
+
+  async upsertMinimalProfile(userId: string, rawInput: unknown) {
+    const input = onboardingProfileInputSchema.parse(rawInput);
+
+    const currentUser = await prisma.user.findUnique({
+      where: {
+        id: userId
+      },
+      select: {
+        id: true,
+        status: true,
+        username: true,
+        profile: {
+          select: {
+            id: true
+          }
+        }
+      }
+    });
+
+    if (!currentUser) {
+      throw new Error("Пользователь не найден.");
+    }
+
+    if (currentUser.status === "BLOCKED" || currentUser.status === "DELETED") {
+      throw new Error(
+        "Анкета недоступна для заблокированного или удалённого пользователя."
+      );
+    }
+
+    const normalizedProgram = input.program
+      ? normalizeStoredProgramId(input.program) ?? input.program
+      : input.direction;
+
+    const result = await prisma.$transaction(async (transaction) => {
+      const profile = await transaction.profile.upsert({
+        where: {
+          userId
+        },
+        create: {
+          userId,
+          fullName: input.fullName,
+          bio: null,
+          campus: input.institution,
+          program: normalizedProgram,
+          courseYear: input.courseYear,
+          telegramUsername: currentUser.username ? `@${currentUser.username}` : null
+        },
+        update: {
+          fullName: input.fullName,
+          campus: input.institution,
+          program: normalizedProgram,
+          courseYear: input.courseYear
+        }
+      });
+
+      const user = await transaction.user.update({
+        where: {
+          id: userId
+        },
+        data: {
+          onboardingCompleted: true
+        },
+        include: {
+          profile: true
+        }
+      });
+
+      return {
+        created: !currentUser.profile,
+        profile,
+        user
+      };
+    });
+
+    return result;
   },
 
   async upsertProfile(userId: string, rawInput: unknown) {

@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { buttonClassName } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { scenarioLabelByValue } from "@/features/matching/lib/match-options";
 import type {
   SerializedConnectionSummary,
@@ -107,14 +108,6 @@ function ConnectionCard({ connection }: { connection: SerializedConnectionSummar
   );
 }
 
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="feedback-box">
-      <p className="feedback-title">{text}</p>
-    </div>
-  );
-}
-
 export function ConnectionsScreenShell({
   initialData
 }: ConnectionsScreenShellProps) {
@@ -122,7 +115,6 @@ export function ConnectionsScreenShell({
   const showIncoming = activeFilter === "ALL" || activeFilter === "INCOMING";
   const showOutgoing = activeFilter === "ALL" || activeFilter === "OUTGOING";
   const showActive = activeFilter === "ALL" || activeFilter === "ACTIVE";
-  const showArchive = activeFilter === "ALL";
 
   return (
     <section className="screen-stack">
@@ -165,7 +157,10 @@ export function ConnectionsScreenShell({
             ))}
           </div>
         ) : (
-          <EmptyState text="Новых входящих пока нет." />
+          <EmptyState
+            title="Входящих пока нет"
+            text="Новые отклики и приглашения появятся здесь."
+          />
         )}
       </section>
       ) : null}
@@ -183,7 +178,10 @@ export function ConnectionsScreenShell({
             ))}
           </div>
         ) : (
-          <EmptyState text="Нет ожидающих откликов или приглашений." />
+          <EmptyState
+            title="Ожиданий пока нет"
+            text="Отправленные отклики и приглашения появятся здесь."
+          />
         )}
       </section>
       ) : null}
@@ -201,31 +199,16 @@ export function ConnectionsScreenShell({
             ))}
           </div>
         ) : (
-          <EmptyState text="Активных связей пока нет." />
+          <EmptyState
+            actionHref="/opportunities"
+            actionLabel="Смотреть возможности"
+            title="Связей пока нет"
+            text="Откликнитесь на запрос или пригласите подходящего человека."
+          />
         )}
       </section>
       ) : null}
 
-      {showArchive ? (
-      <section className="surface-card screen-stack">
-        <div className="screen-copy">
-          <p className="card-eyebrow">История</p>
-          <h2 className="card-title">Архив</h2>
-        </div>
-        {initialData.archive.length > 0 || initialData.ended.length > 0 ? (
-          <div className="match-list">
-            {initialData.archive.map((interaction) => (
-              <InteractionCard interaction={interaction} key={interaction.id} />
-            ))}
-            {initialData.ended.map((connection) => (
-              <ConnectionCard connection={connection} key={connection.id} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState text="Архив пока пуст." />
-        )}
-      </section>
-      ) : null}
     </section>
   );
 }

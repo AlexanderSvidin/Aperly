@@ -18,14 +18,13 @@ export default async function ConnectionDetailPage({
 }: ConnectionDetailPageProps) {
   const user = await requirePageUser();
   const resolvedParams = await params;
+  let connection;
 
   try {
-    const connection = await connectionService.getConnectionForUser(
+    connection = await connectionService.getConnectionForUser(
       user.id,
       resolvedParams.connectionId
     );
-
-    return <ConnectionDetailShell connection={connection} key={user.id} />;
   } catch (error) {
     if (error instanceof ConnectionDomainError && error.status === 404) {
       notFound();
@@ -33,4 +32,6 @@ export default async function ConnectionDetailPage({
 
     throw error;
   }
+
+  return <ConnectionDetailShell connection={connection} key={user.id} />;
 }

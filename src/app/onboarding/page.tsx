@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { ProfileScreenShell } from "@/features/profile/components/profile-screen-shell";
+import { MinimalOnboardingForm } from "@/features/profile/components/minimal-onboarding-form";
 import { requirePageUser } from "@/server/services/auth/current-user";
-import { profileService } from "@/server/services/profile/profile-service";
 
 export default async function OnboardingPage() {
   const user = await requirePageUser({
@@ -13,19 +12,15 @@ export default async function OnboardingPage() {
     redirect("/opportunities");
   }
 
-  const editorData = await profileService.getEditorData(user.id);
-
-  if (!editorData) {
-    redirect("/");
-  }
+  const telegramIdentity = [user.firstName, user.lastName]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <main className="welcome-layout">
-      <ProfileScreenShell
-        initialValues={editorData.initialValues}
-        lookups={editorData.lookups}
-        mode="onboarding"
-        viewer={editorData.viewer}
+      <MinimalOnboardingForm
+        defaultFullName={user.profile?.fullName ?? telegramIdentity}
+        defaultInstitution={user.profile?.campus ?? undefined}
       />
     </main>
   );
