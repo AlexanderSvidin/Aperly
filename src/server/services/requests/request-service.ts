@@ -12,7 +12,6 @@ import {
   normalizeStoredProgramId
 } from "@/features/study/lib/study-catalog";
 import { matchingService } from "@/server/services/matching/matching-service";
-import { buildActiveRequestDuplicateWhere } from "@/server/services/requests/request-constraints";
 import {
   loadStudySubjectLookups,
   resolveSubjectIdsWithCustomNames
@@ -200,31 +199,6 @@ async function syncExpiredRequestsForUser(ownerId: string) {
       status: "EXPIRED"
     }
   });
-}
-
-async function assertNoActiveScenarioDuplicate(
-  ownerId: string,
-  scenario: RequestInput["scenario"],
-  excludeRequestId?: string
-) {
-  const duplicate = await prisma.request.findFirst({
-    where: buildActiveRequestDuplicateWhere(ownerId, scenario, excludeRequestId),
-    select: {
-      id: true
-    }
-  });
-
-  if (duplicate) {
-    throw new RequestDomainError({
-      code: "request_active_duplicate",
-      message:
-        "У вас уже есть активный запрос этого сценария. Измените его или сначала архивируйте.",
-      status: 409,
-      meta: {
-        requestId: duplicate.id
-      }
-    });
-  }
 }
 
 async function replaceAvailabilitySlots(
@@ -482,8 +456,6 @@ export const requestService: RequestService = {
 
     const input = requestInputSchema.parse(rawInput);
 
-    await assertNoActiveScenarioDuplicate(actor.id, input.scenario);
-
     const created = await prisma.$transaction(async (transaction) => {
       const request = await transaction.request.create({
         data: {
@@ -642,12 +614,6 @@ export const requestService: RequestService = {
         status: 409
       });
     }
-
-    await assertNoActiveScenarioDuplicate(
-      actor.id,
-      existingRequest.scenario,
-      existingRequest.id
-    );
 
     const renewed = await prisma.request.update({
       where: {

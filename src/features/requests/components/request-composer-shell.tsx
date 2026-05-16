@@ -57,6 +57,14 @@ type RequestComposerShellProps = {
   initialScenario?: RequestScenario;
   /** When set, hides the scenario picker and locks the form to one scenario. */
   singleScenario?: RequestScenario;
+  /**
+   * "create" forces a fresh draft and POSTs a new request on submit, regardless
+   * of any existing active request for the same scenario. "edit" keeps the
+   * legacy behaviour of attaching to the user's existing active request. The
+   * id of the request to edit (when in edit mode) is taken from
+   * `initialScenario` -> existing active request mapping.
+   */
+  mode?: "create" | "edit";
 };
 
 type AvailabilityDraft = {
@@ -383,8 +391,10 @@ export function RequestComposerShell({
   subjects,
   studyDefaults,
   initialScenario,
-  singleScenario
+  singleScenario,
+  mode = "edit"
 }: RequestComposerShellProps) {
+  const isCreateMode = mode === "create";
   const router = useRouter();
   const [requests, setRequests] = useState(initialRequests);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
@@ -421,13 +431,19 @@ export function RequestComposerShell({
   const [selectedScenario, setSelectedScenario] =
     useState<RequestScenario | null>(effectiveInitialScenario);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(
-    effectiveInitialScenario
-      ? (activeRequestsByScenario.get(effectiveInitialScenario)?.id ?? null)
-      : null
+    isCreateMode
+      ? null
+      : effectiveInitialScenario
+        ? (activeRequestsByScenario.get(effectiveInitialScenario)?.id ?? null)
+        : null
   );
   const [draft, setDraft] = useState<RequestDraft | null>(() => {
     if (!effectiveInitialScenario) {
       return null;
+    }
+
+    if (isCreateMode) {
+      return createDefaultDraft(effectiveInitialScenario, subjects);
     }
 
     const activeRequest = activeRequestsByScenario.get(
@@ -481,6 +497,14 @@ export function RequestComposerShell({
   }
 
   function selectScenario(scenario: RequestScenario) {
+    if (isCreateMode) {
+      setSelectedScenario(scenario);
+      setEditingRequestId(null);
+      setDraft(createDefaultDraft(scenario, subjects));
+      setFeedback(null);
+      return;
+    }
+
     const activeRequest = activeRequestsByScenario.get(scenario);
 
     setSelectedScenario(scenario);
@@ -676,16 +700,6 @@ export function RequestComposerShell({
       } | null;
 
       if (!response.ok || !result?.request) {
-        if (result?.meta?.requestId) {
-          const existingRequest = requests.find(
-            (request) => request.id === result.meta?.requestId
-          );
-
-          if (existingRequest) {
-            startEditingRequest(existingRequest);
-          }
-        }
-
         const message = result?.message ?? "Не удалось сохранить запрос.";
         setActionStatus(actionKey, {
           status: "error",
@@ -960,13 +974,6 @@ export function RequestComposerShell({
     })();
   }
 
-  const latestForSelectedScenario = selectedScenario
-    ? latestRequestsByScenario.get(selectedScenario)
-    : undefined;
-  const activeForSelectedScenario = selectedScenario
-    ? activeRequestsByScenario.get(selectedScenario)
-    : undefined;
-
   const scenarioLabel = singleScenario
     ? (requestScenarioOptions.find((o) => o.value === singleScenario)?.label ??
       singleScenario)
@@ -1161,17 +1168,15 @@ export function RequestComposerShell({
             </div>
           ) : null}
 
-          <div className="request-inline-banner">
-            <p className="helper-text">
-              {selectedScenario
-                ? activeForSelectedScenario
-                  ? "У вас уже есть активный запрос для этого сценария. Мы обновим его вместо создания нового."
-                  : latestForSelectedScenario
-                    ? `Последний запрос сейчас имеет статус «${getRequestStatusBadge(latestForSelectedScenario).label}».`
-                    : "Можно заполнить новый запрос и сразу перейти к откликам."
-                : "Выберите сценарий. Это помогает системе понять, что именно искать: команду, партнёров проекта или партнёра для совместной учёбы."}
-            </p>
-          </div>
+          {!selectedScenario ? (
+            <div className="request-inline-banner">
+              <p className="helper-text">
+                Выберите сценарий. Это помогает системе понять, что именно
+                искать: команду, партнёров проекта или партнёра для совместной
+                учёбы.
+              </p>
+            </div>
+          ) : null}
 
           {!draft ? null : draft.scenario === "CASE" ? (
             <>

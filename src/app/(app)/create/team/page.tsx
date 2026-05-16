@@ -10,6 +10,7 @@ export default async function CreateTeamPage() {
     <RequestComposerShell
       initialRequests={composerData.requests}
       key={user.id}
+      mode="create"
       singleScenario="CASE"
       studyDefaults={composerData.studyDefaults}
       subjects={composerData.subjects}
