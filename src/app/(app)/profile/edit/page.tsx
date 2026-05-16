@@ -13,12 +13,10 @@ const sections = [
 export default function ProfileEditPage() {
   return (
     <section className="screen-stack">
-      <section className="surface-card screen-stack">
-        <div className="screen-copy">
-          <p className="card-eyebrow">Профиль</p>
-          <h1 className="screen-title">Редактировать</h1>
-        </div>
-      </section>
+      <div className="screen-copy">
+        <h1 className="page-title">Редактировать профиль</h1>
+        <p className="screen-description">Что можно изменить</p>
+      </div>
       <div className="screen-grid">
         {sections.map((section) => (
           <article className="surface-card screen-stack" key={section.href}>

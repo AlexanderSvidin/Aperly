@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 
@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 
 import { Button, buttonClassName } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ScenarioIconBadge } from "@/components/ui/scenario-icon";
 import type {
   SerializedHomeFeedData,
   SerializedHomeOpportunity
@@ -85,33 +86,29 @@ export function HomeScreenShell({
 
   return (
     <section className="screen-stack">
-      <section className="surface-card screen-stack">
-        <div className="screen-copy">
-          <p className="card-eyebrow">Aperly | Возможности</p>
-          <h1 className="screen-title">Возможности</h1>
-          <p className="screen-description">
-            {showWelcomeSelector
-              ? `Привет, ${viewerName}. Открытые запросы студентов уже здесь.`
-              : "Открытые запросы студентов"}
-          </p>
-        </div>
+      <div className="screen-copy">
+        <p className="screen-description">
+          {showWelcomeSelector
+            ? `Привет, ${viewerName}. Открытые запросы студентов уже здесь.`
+            : "Открытые запросы студентов"}
+        </p>
+      </div>
 
-        <div className="home-feed-tabs" role="tablist" aria-label="Фильтр возможностей">
-          {feedTabs.map((tab) => (
-            <button
-              key={tab.value}
-              aria-selected={activeFilter === tab.value}
-              className="toggle-chip"
-              data-selected={activeFilter === tab.value}
-              onClick={() => setActiveFilter(tab.value)}
-              role="tab"
-              type="button"
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </section>
+      <div className="home-feed-tabs" role="tablist" aria-label="Фильтр возможностей">
+        {feedTabs.map((tab) => (
+          <button
+            key={tab.value}
+            aria-selected={activeFilter === tab.value}
+            className="filter-chip"
+            data-selected={activeFilter === tab.value}
+            onClick={() => setActiveFilter(tab.value)}
+            role="tab"
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {visibleOpportunities.length === 0 ? (
         <section className="surface-card screen-stack">
@@ -133,67 +130,70 @@ export function HomeScreenShell({
               : opportunity.responseState.label;
 
             return (
-            <article key={opportunity.id} className="opportunity-card">
-              <Link
-                aria-label={`Открыть запрос ${opportunity.title}`}
-                className="opportunity-card-main"
-                href={buildOpportunityHref(opportunity)}
-              >
-                <div className="match-badge-row">
-                  <span className="status-pill">
-                    {scenarioLabelByValue[opportunity.scenario]}
-                  </span>
-                  <span className="tone-pill" data-tone="success">
-                    {opportunity.trustInfo}
-                  </span>
-                </div>
-
-                <div className="screen-copy">
-                  <h2 className="card-title">{opportunity.title}</h2>
-                  <p className="card-body-copy">{opportunity.goal}</p>
-                </div>
-
-                <div className="chip-row">
-                  <span className="info-chip">{opportunity.meta}</span>
-                  {opportunity.format ? (
-                    <span className="info-chip">{opportunity.format}</span>
-                  ) : null}
-                  {opportunity.time ? (
-                    <span className="info-chip">{opportunity.time}</span>
-                  ) : null}
-                </div>
-
-                <div className="opportunity-author">
-                  <strong>{opportunity.author.name}</strong>
-                  <span>{formatAuthorMeta(opportunity)}</span>
-                </div>
-
-                <p className="helper-text">{opportunity.relevanceReason}</p>
-                <p className="helper-text">
-                  Активно до {formatRequestDate(opportunity.expiresAt)}
-                </p>
-              </Link>
-
-              {isRespondable ? (
-                <Button
-                  fullWidth
-                  onClick={() => setSelectedOpportunity(opportunity)}
-                >
-                  {opportunity.responseState.label}
-                </Button>
-              ) : opportunity.responseState.connectionId ? (
+              <article key={opportunity.id} className="opportunity-card">
                 <Link
-                  className={buttonClassName({ fullWidth: true })}
-                  href={`/connections/${opportunity.responseState.connectionId}` as Route}
+                  aria-label={`Открыть запрос ${opportunity.title}`}
+                  className="opportunity-card-main"
+                  href={buildOpportunityHref(opportunity)}
                 >
-                  {opportunity.responseState.label}
+                  <div className="opportunity-card-head">
+                    <span className="scenario-tag">
+                      <ScenarioIconBadge scenario={opportunity.scenario} variant="inline" />
+                      {scenarioLabelByValue[opportunity.scenario]}
+                    </span>
+                  </div>
+
+                  <div className="screen-copy">
+                    <h2 className="opportunity-title">{opportunity.title}</h2>
+                    <p className="opportunity-subtitle">{opportunity.goal}</p>
+                  </div>
+
+                  <div className="opportunity-meta-row">
+                    {opportunity.time ? (
+                      <span className="meta-chip">
+                        <CalendarIcon /> {opportunity.time}
+                      </span>
+                    ) : opportunity.meta ? (
+                      <span className="meta-chip">
+                        <CalendarIcon /> {opportunity.meta}
+                      </span>
+                    ) : null}
+                    {opportunity.format ? (
+                      <span className="meta-chip-soft">{opportunity.format}</span>
+                    ) : null}
+                  </div>
+
+                  <div className="opportunity-author">
+                    <strong>{opportunity.author.name}</strong>
+                    <span>{formatAuthorMeta(opportunity)}</span>
+                  </div>
+
+                  <p className="helper-text">{opportunity.relevanceReason}</p>
+                  <p className="helper-text">
+                    Активно до {formatRequestDate(opportunity.expiresAt)}
+                  </p>
                 </Link>
-              ) : (
-                <Button disabled fullWidth variant="secondary">
-                  {statusLabel}
-                </Button>
-              )}
-            </article>
+
+                {isRespondable ? (
+                  <Button
+                    fullWidth
+                    onClick={() => setSelectedOpportunity(opportunity)}
+                  >
+                    Откликнуться
+                  </Button>
+                ) : opportunity.responseState.connectionId ? (
+                  <Link
+                    className={buttonClassName({ fullWidth: true })}
+                    href={`/connections/${opportunity.responseState.connectionId}` as Route}
+                  >
+                    {opportunity.responseState.label}
+                  </Link>
+                ) : (
+                  <Button disabled fullWidth variant="secondary">
+                    {statusLabel}
+                  </Button>
+                )}
+              </article>
             );
           })}
         </div>
@@ -216,5 +216,26 @@ export function HomeScreenShell({
         }
       />
     </section>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="8" y1="3" x2="8" y2="7" />
+      <line x1="16" y1="3" x2="16" y2="7" />
+    </svg>
   );
 }

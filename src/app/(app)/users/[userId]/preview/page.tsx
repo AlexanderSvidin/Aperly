@@ -1,14 +1,22 @@
 import { notFound } from "next/navigation";
 
+import { Avatar } from "@/components/ui/avatar";
 import { buttonClassName } from "@/components/ui/button";
 import Link from "next/link";
 import type { Route } from "next";
 import { PreviewInviteAction } from "@/features/matching/components/preview-invite-action";
 import { formatOptions } from "@/features/profile/lib/profile-options";
+import {
+  collaborationRoleOptions
+} from "@/features/requests/lib/request-options";
 import { getProgramLabel } from "@/features/study/lib/study-catalog";
 import { requirePageUser } from "@/server/services/auth/current-user";
 import { matchingService } from "@/server/services/matching/matching-service";
 import { prisma } from "@/server/db/client";
+
+const roleLabelByValue = Object.fromEntries(
+  collaborationRoleOptions.map((option) => [option.value, option.label])
+) as Record<string, string>;
 
 type UserPreviewPageProps = {
   params: Promise<{
@@ -151,38 +159,104 @@ export default async function UserPreviewPage({
         .catch(() => null)
     : null;
 
+  const displayName = buildDisplayName(user);
+  const subjectsAsWants = user.userSubjects.slice(0, 8).map((e) => e.subject.name);
+  const skillsAsCan = user.userSkills.slice(0, 10).map((e) => e.skill.name);
+
+  // Build "Why fit" reasons from match context
+  const matchReasons = inviteContext?.reasons ?? [];
+
+  // Collect user roles from their profile (preferredRoles array)
+  const userRoles: string[] = [];
+  if (Array.isArray(user.profile?.preferredRoles)) {
+    for (const role of user.profile.preferredRoles) {
+      const label = roleLabelByValue[role] ?? role;
+      if (!userRoles.includes(label)) userRoles.push(label);
+    }
+  }
+
   return (
     <section className="screen-stack">
       <section className="surface-card screen-stack">
-        <div className="screen-copy">
-          <p className="card-eyebrow">Профиль</p>
-          <h1 className="screen-title">{buildDisplayName(user)}</h1>
-          <p className="screen-description">
-            {[getProgramLabel(user.profile?.program), user.profile?.courseYear
-              ? `${user.profile.courseYear} курс`
-              : null]
-              .filter(Boolean)
-              .join(", ") || "Профиль заполнен частично"}
-          </p>
+        <div className="user-preview-head">
+          <Avatar name={displayName} size="lg" />
+          <div className="screen-copy">
+            <h1 className="page-title">{displayName}</h1>
+            <p className="screen-description">
+              {[
+                getProgramLabel(user.profile?.program),
+                user.profile?.courseYear ? `${user.profile.courseYear} курс` : null
+              ]
+                .filter(Boolean)
+                .join(", ") || "Профиль заполнен частично"}
+            </p>
+          </div>
         </div>
 
         {user.profile?.bio ? (
           <p className="card-body-copy">{user.profile.bio}</p>
         ) : null}
+      </section>
 
-        <div className="chip-row">
-          {user.userSkills.slice(0, 8).map((entry) => (
-            <span className="info-chip" key={entry.skillId}>
-              {entry.skill.name}
-            </span>
-          ))}
-          {user.userSubjects.slice(0, 6).map((entry) => (
-            <span className="info-chip" key={entry.subjectId}>
-              {entry.subject.name}
-            </span>
-          ))}
-        </div>
+      {skillsAsCan.length > 0 ? (
+        <section className="surface-card screen-stack">
+          <div className="labeled-section">
+            <h2 className="labeled-section-title">Умеет</h2>
+            <div className="chip-row">
+              {skillsAsCan.map((skill) => (
+                <span className="info-chip" key={skill}>
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
+      {subjectsAsWants.length > 0 ? (
+        <section className="surface-card screen-stack">
+          <div className="labeled-section">
+            <h2 className="labeled-section-title">Хочет подтянуть</h2>
+            <div className="chip-row">
+              {subjectsAsWants.map((subject) => (
+                <span className="info-chip" key={subject}>
+                  {subject}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {userRoles.length > 0 ? (
+        <section className="surface-card screen-stack">
+          <div className="labeled-section">
+            <h2 className="labeled-section-title">Роли</h2>
+            <div className="chip-row">
+              {userRoles.map((role) => (
+                <span className="info-chip" key={role}>
+                  {role}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {matchReasons.length > 0 ? (
+        <section className="surface-card screen-stack">
+          <div className="labeled-section">
+            <h2 className="labeled-section-title">Почему подходит</h2>
+            <ul className="why-fit-list">
+              {matchReasons.slice(0, 4).map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="surface-card screen-stack">
         <div className="feedback-box">
           <p className="feedback-title">Telegram скрыт до активной связи.</p>
         </div>
@@ -191,7 +265,7 @@ export default async function UserPreviewPage({
           <PreviewInviteAction
             invite={{
               matchId: inviteContext.id,
-              candidateName: buildDisplayName(user),
+              candidateName: displayName,
               requestTitle: inviteContext.request.title,
               requestType: previewScenarioLabels[inviteContext.request.scenario],
               role:
@@ -217,13 +291,19 @@ export default async function UserPreviewPage({
           </span>
         ) : null}
 
-        <Link
-          className={buttonClassName({ variant: "secondary" })}
-          href="/opportunities"
-        >
-          К возможностям
-        </Link>
+        <BackLink />
       </section>
     </section>
+  );
+}
+
+function BackLink() {
+  return (
+    <Link
+      className={buttonClassName({ variant: "secondary" })}
+      href="/opportunities"
+    >
+      Назад
+    </Link>
   );
 }

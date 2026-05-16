@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { useRouter } from "next/navigation";
 
+import { AperlyLogo } from "@/components/brand/aperly-logo";
 import { Button } from "@/components/ui/button";
 import {
   getCourseOptionsForProgram,
@@ -51,7 +52,7 @@ function extractIssueMessages(payload: unknown) {
 
 export function MinimalOnboardingForm({
   defaultFullName,
-  defaultInstitution = "НИУ ВШЭ - Пермь"
+  defaultInstitution = "НИУ ВШЭ — Пермь"
 }: MinimalOnboardingFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -137,14 +138,17 @@ export function MinimalOnboardingForm({
   }
 
   return (
-    <section className="screen-stack">
-      <div className="screen-copy">
-        <p className="card-eyebrow">Aperly</p>
-        <h1 className="screen-title">Расскажите о себе</h1>
-        <p className="screen-description">Это займёт пару минут</p>
+    <section className="onboarding-screen">
+      <div className="onboarding-brand">
+        <AperlyLogo size="lg" />
       </div>
 
-      <form className="surface-card screen-stack" onSubmit={handleSubmit}>
+      <div className="onboarding-heading">
+        <h1 className="onboarding-title">Расскажите о себе</h1>
+        <p className="onboarding-subtitle">Это займёт пару минут</p>
+      </div>
+
+      <form className="onboarding-form" onSubmit={handleSubmit}>
         {feedback ? (
           <div
             className={
@@ -177,49 +181,31 @@ export function MinimalOnboardingForm({
         </label>
 
         <label className="field-stack">
-          <span className="field-label">Вуз</span>
-          <input
-            className="field-input"
-            maxLength={160}
+          <span className="field-label">Учебное заведение</span>
+          <select
+            className="field-input field-select"
             onChange={(event) => setInstitution(event.target.value)}
-            placeholder="НИУ ВШЭ - Пермь"
-            required
             value={institution}
-          />
+          >
+            <option value="НИУ ВШЭ — Пермь">НИУ ВШЭ — Пермь</option>
+          </select>
         </label>
 
-        <div className="form-grid">
-          <label className="field-stack">
-            <span className="field-label">Тип программы</span>
-            <select
-              className="field-input field-select"
-              onChange={(event) =>
-                handleProgramTypeChange(event.target.value as StudyLevelId)
-              }
-              value={programType}
-            >
-              {studyLevelOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field-stack">
-            <span className="field-label">Курс</span>
-            <select
-              className="field-input field-select"
-              onChange={(event) => setCourseYear(Number(event.target.value))}
-              value={String(courseYear)}
-            >
-              {courseOptions.map((value) => (
-                <option key={value} value={value}>
-                  {value} курс
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="field-stack">
+          <span className="field-label">Тип программы</span>
+          <div className="segmented-row" role="group">
+            {studyLevelOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className="segmented-chip"
+                data-selected={programType === option.value}
+                onClick={() => handleProgramTypeChange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <label className="field-stack">
@@ -228,7 +214,7 @@ export function MinimalOnboardingForm({
             className="field-input"
             maxLength={160}
             onChange={(event) => setDirection(event.target.value)}
-            placeholder="Например, экономика, менеджмент или бизнес-информатика"
+            placeholder="Например, 38.03.01 Экономика"
             required
             value={direction}
           />
@@ -241,7 +227,7 @@ export function MinimalOnboardingForm({
             onChange={(event) => handleProgramChange(event.target.value)}
             value={program}
           >
-            <option value="">Не выбрана</option>
+            <option value="">Необязательно</option>
             {availablePrograms.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}
@@ -249,6 +235,23 @@ export function MinimalOnboardingForm({
             ))}
           </select>
         </label>
+
+        <div className="field-stack">
+          <span className="field-label">Курс</span>
+          <div className="segmented-row" role="group">
+            {courseOptions.map((value) => (
+              <button
+                key={value}
+                type="button"
+                className="segmented-chip"
+                data-selected={courseYear === value}
+                onClick={() => setCourseYear(value)}
+              >
+                {value} курс
+              </button>
+            ))}
+          </div>
+        </div>
 
         <Button
           disabled={isPending}

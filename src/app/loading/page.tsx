@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
+import { AperlyLogo } from "@/components/brand/aperly-logo";
 import { Button } from "@/components/ui/button";
 
 type MePayload =
@@ -70,14 +71,10 @@ export default function LoadingPage() {
   }, [checkSession]);
 
   return (
-    <main className="welcome-layout">
-      <section className="surface-card screen-stack loading-screen-card">
-        <div className="loading-brand">
-          <p className="loading-brand-name">Aperly</p>
-        </div>
-        <div className="screen-copy">
-          <h1 className="screen-title">Ищем ваш профиль в Telegram</h1>
-        </div>
+    <main className="loading-screen">
+      <div className="loading-screen-inner">
+        <AperlyLogo size="xl" />
+        <p className="loading-status">Ищем ваш профиль в Telegram</p>
         {error ? (
           <div className="feedback-box error-box">
             <p className="feedback-title">{error}</p>
@@ -92,7 +89,7 @@ export default function LoadingPage() {
             Повторить
           </Button>
         ) : null}
-      </section>
+      </div>
     </main>
   );
 }

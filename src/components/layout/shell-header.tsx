@@ -1,7 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { usePathname } from "next/navigation";
+
+import { AperlyLogo } from "@/components/brand/aperly-logo";
 
 const sectionTitles: { prefix: string; label: string }[] = [
   { prefix: "/opportunities", label: "Возможности" },
@@ -11,8 +12,9 @@ const sectionTitles: { prefix: string; label: string }[] = [
 ];
 
 function getSectionLabel(pathname: string): string | null {
+  // Show section label only on top-level tab routes
   for (const { prefix, label } of sectionTitles) {
-    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+    if (pathname === prefix) {
       return label;
     }
   }
@@ -27,18 +29,12 @@ export function ShellHeader() {
   return (
     <header className="shell-header">
       <div className="shell-brand-row" aria-label="Aperly">
-        <Image
-          alt="Aperly"
-          className="shell-logo-image"
-          height={36}
-          priority
-          src="/aperly-logo.png"
-          width={128}
-        />
+        <AperlyLogo size="md" />
         {sectionLabel ? (
-          <span className="shell-section-label" aria-hidden="true">
-            {" | "}{sectionLabel}
-          </span>
+          <>
+            <span className="shell-header-divider" aria-hidden="true" />
+            <span className="shell-section-label">{sectionLabel}</span>
+          </>
         ) : null}
       </div>
     </header>

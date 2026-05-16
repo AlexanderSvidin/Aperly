@@ -135,13 +135,6 @@ export default async function ProfilePage() {
     <section className="screen-stack">
       <section className="surface-card screen-stack">
         <div className="screen-copy">
-          <p className="card-eyebrow">Aperly | Профиль</p>
-          <h1 className="screen-title">Профиль</h1>
-        </div>
-      </section>
-
-      <section className="surface-card screen-stack">
-        <div className="screen-copy">
           <p className="card-eyebrow">Карточка</p>
           <h2 className="screen-title">{displayName || "Студент HSE Perm"}</h2>
           <p className="screen-description">

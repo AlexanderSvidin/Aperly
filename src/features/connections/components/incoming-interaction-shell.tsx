@@ -5,8 +5,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClassName } from "@/components/ui/button";
 import { scenarioLabelByValue } from "@/features/matching/lib/match-options";
+import {
+  collaborationRoleOptions,
+  formatRequestDate
+} from "@/features/requests/lib/request-options";
+import { formatOptions } from "@/features/profile/lib/profile-options";
 import type { SerializedInteractionDetail } from "@/features/connections/lib/connection-types";
 import type { ActionState } from "@/lib/ui/action-state";
 import { idleActionState, isActionLoading } from "@/lib/ui/action-state";
@@ -14,6 +20,14 @@ import { idleActionState, isActionLoading } from "@/lib/ui/action-state";
 type IncomingInteractionShellProps = {
   interaction: SerializedInteractionDetail;
 };
+
+const roleLabelByValue = Object.fromEntries(
+  collaborationRoleOptions.map((option) => [option.value, option.label])
+) as Record<string, string>;
+
+const formatLabelByValue = Object.fromEntries(
+  formatOptions.map((option) => [option.value, option.label])
+) as Record<string, string>;
 
 export function IncomingInteractionShell({
   interaction
@@ -82,36 +96,89 @@ export function IncomingInteractionShell({
     })();
   }
 
+  const requestSummary = interaction.requestSummary;
+  const otherProfile = interaction.otherProfile;
+
   return (
     <section className="screen-stack">
+      <div className="screen-copy">
+        <h1 className="page-title">{title}</h1>
+        <p className="screen-description">{description}</p>
+      </div>
+
       <section className="surface-card screen-stack">
-        <div className="screen-copy">
-          <p className="card-eyebrow">
-            {interaction.type === "RESPONSE" ? "Отклик" : "Приглашение"}
-          </p>
-          <h1 className="screen-title">{title}</h1>
-          <p className="screen-description">{description}</p>
+        <div className="user-preview-head">
+          <Avatar name={otherProfile?.name ?? interaction.personName} size="md" />
+          <div className="screen-copy">
+            <h2 className="card-title">
+              {otherProfile?.name ?? interaction.personName}
+            </h2>
+            {otherProfile?.courseInfo ? (
+              <p className="helper-text">{otherProfile.courseInfo}</p>
+            ) : null}
+          </div>
         </div>
 
-        <div className="match-badge-row">
-          <span className="status-pill">
-            {scenarioLabelByValue[interaction.scenario]}
-          </span>
-          <span className="tone-pill" data-tone="warning">
-            Входящее
-          </span>
-        </div>
+        <p className="card-body-copy">{interaction.message}</p>
+
+        {otherProfile && otherProfile.skills.length > 0 ? (
+          <div className="labeled-section">
+            <h3 className="labeled-section-title">Умеет</h3>
+            <div className="chip-row">
+              {otherProfile.skills.map((skill) => (
+                <span className="info-chip" key={skill}>
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
 
+      {requestSummary ? (
+        <section className="surface-card screen-stack">
+          <div className="labeled-section">
+            <h3 className="labeled-section-title">
+              {isResponse ? "Ваш запрос" : "Запрос"}
+            </h3>
+            <div className="match-badge-row">
+              <span className="status-pill">
+                {scenarioLabelByValue[requestSummary.scenario]}
+              </span>
+            </div>
+            <h2 className="card-title">{requestSummary.title}</h2>
+            <div className="chip-row">
+              {requestSummary.format ? (
+                <span className="info-chip">
+                  {formatLabelByValue[requestSummary.format] ?? requestSummary.format}
+                </span>
+              ) : null}
+              {requestSummary.expiresAt ? (
+                <span className="info-chip">
+                  до {formatRequestDate(requestSummary.expiresAt)}
+                </span>
+              ) : null}
+            </div>
+            {requestSummary.roles.length > 0 ? (
+              <div className="chip-row">
+                {requestSummary.roles.map((role) => (
+                  <span className="info-chip" key={role}>
+                    {roleLabelByValue[role] ?? role}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {requestSummary.comment ? (
+              <p className="card-body-copy">{requestSummary.comment}</p>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
       <section className="surface-card screen-stack">
-        <div className="screen-copy">
-          <p className="card-eyebrow">От кого</p>
-          <h2 className="card-title">{interaction.personName}</h2>
-          <p className="card-body-copy">{interaction.message}</p>
-          <p className="helper-text">
-            Telegram контакт будет открыт только после принятия.
-          </p>
-        </div>
+        <p className="helper-text">
+          Telegram-контакт будет открыт только после принятия.
+        </p>
 
         {actionState.status !== "idle" ? (
           <div

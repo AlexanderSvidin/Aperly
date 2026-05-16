@@ -14,6 +14,82 @@ import { analyticsService } from "@/server/services/analytics/analytics-service"
 const DEFAULT_INTERACTION_MESSAGE = "Привет! Мне интересно подключиться.";
 const INTERACTION_MESSAGE_MAX_LENGTH = 300;
 
+async function loadOtherProfile(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      profile: true,
+      userSkills: {
+        include: { skill: true },
+        take: 6
+      }
+    }
+  });
+  if (!user) return null;
+  const displayName =
+    user.profile?.fullName ||
+    [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
+    "Студент";
+  const courseParts = [
+    user.profile?.program,
+    user.profile?.courseYear ? `${user.profile.courseYear} курс` : null
+  ].filter(Boolean) as string[];
+  return {
+    name: displayName,
+    courseInfo: courseParts.length > 0 ? courseParts.join(", ") : null,
+    skills: user.userSkills.map((entry) => entry.skill.name)
+  };
+}
+
+async function loadRequestSummary(requestId: string) {
+  const request = await prisma.request.findUnique({
+    where: { id: requestId },
+    include: {
+      studyDetails: { include: { subject: true } },
+      caseDetails: true,
+      projectDetails: true,
+      activityDetails: true
+    }
+  });
+  if (!request) return null;
+  let title = "Запрос";
+  let format: string | null = null;
+  let comment: string | null = null;
+  const roles: string[] = [];
+
+  if (request.studyDetails) {
+    title = request.studyDetails.subject?.name ?? "Учебный запрос";
+    format = request.studyDetails.preferredFormat ?? null;
+    comment = request.studyDetails.goal ?? null;
+  } else if (request.caseDetails) {
+    title = request.caseDetails.eventName;
+    format = request.caseDetails.preferredFormat ?? null;
+    if (Array.isArray(request.caseDetails.neededRoles)) {
+      roles.push(...(request.caseDetails.neededRoles as string[]));
+    }
+  } else if (request.projectDetails) {
+    title = request.projectDetails.projectTitle;
+    format = request.projectDetails.preferredFormat ?? null;
+    comment = request.projectDetails.shortDescription ?? null;
+    if (Array.isArray(request.projectDetails.neededRoles)) {
+      roles.push(...(request.projectDetails.neededRoles as string[]));
+    }
+  } else if (request.activityDetails) {
+    title = request.activityDetails.title;
+    format = request.activityDetails.preferredFormat ?? null;
+    comment = request.activityDetails.comment ?? null;
+  }
+
+  return {
+    scenario: request.scenario as ScenarioType,
+    title,
+    format,
+    expiresAt: request.expiresAt ? request.expiresAt.toISOString() : null,
+    comment,
+    roles
+  };
+}
+
 const userNameSelect = {
   id: true,
   firstName: true,
@@ -1025,6 +1101,27 @@ export const connectionService = {
       });
     }
 
+    // Determine "other user" id (not viewer)
+    const otherUserId =
+      interaction.senderUserId === userId
+        ? interaction.recipientUserId
+        : interaction.senderUserId;
+
+    // Choose request to summarise: for RESPONSE on author's request — sourceRequest (author's own)
+    // For INVITATION — sourceRequest (inviter's request) is what recipient is being invited into
+    const relevantRequestId =
+      interaction.sourceRequestId ?? interaction.targetRequestId;
+
+    let otherProfile = null as Awaited<ReturnType<typeof loadOtherProfile>> | null;
+    let requestSummary = null as Awaited<ReturnType<typeof loadRequestSummary>> | null;
+
+    if (otherUserId) {
+      otherProfile = await loadOtherProfile(otherUserId);
+    }
+    if (relevantRequestId) {
+      requestSummary = await loadRequestSummary(relevantRequestId);
+    }
+
     return {
       ...serializeInteraction(interaction, userId),
       canAccept:
@@ -1032,7 +1129,9 @@ export const connectionService = {
       canDecline:
         interaction.status === "PENDING" && interaction.recipientUserId === userId,
       sourceRequestId: interaction.sourceRequestId,
-      targetRequestId: interaction.targetRequestId
+      targetRequestId: interaction.targetRequestId,
+      otherProfile,
+      requestSummary
     };
   },
 

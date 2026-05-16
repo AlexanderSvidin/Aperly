@@ -118,31 +118,28 @@ export function ConnectionsScreenShell({
 
   return (
     <section className="screen-stack">
-      <section className="surface-card screen-stack">
-        <div className="screen-copy">
-          <p className="card-eyebrow">Связи</p>
-          <h1 className="screen-title">Входящие, ожидание и активные связи</h1>
-          <p className="screen-description">
-            Здесь видны отклики и приглашения. Telegram откроется только после
-            взаимного согласия.
-          </p>
-        </div>
-        <div className="home-feed-tabs" role="tablist" aria-label="Фильтр связей">
-          {connectionFilters.map((filter) => (
-            <button
-              key={filter.value}
-              aria-selected={activeFilter === filter.value}
-              className="toggle-chip"
-              data-selected={activeFilter === filter.value}
-              onClick={() => setActiveFilter(filter.value)}
-              role="tab"
-              type="button"
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-      </section>
+      <div className="screen-copy">
+        <h1 className="page-title">Люди и отклики</h1>
+        <p className="screen-description">
+          Здесь видны отклики и приглашения. Telegram откроется только после
+          взаимного согласия.
+        </p>
+      </div>
+      <div className="home-feed-tabs" role="tablist" aria-label="Фильтр связей">
+        {connectionFilters.map((filter) => (
+          <button
+            key={filter.value}
+            aria-selected={activeFilter === filter.value}
+            className="filter-chip"
+            data-selected={activeFilter === filter.value}
+            onClick={() => setActiveFilter(filter.value)}
+            role="tab"
+            type="button"
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
 
       {showIncoming ? (
       <section className="surface-card screen-stack">

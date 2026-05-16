@@ -3,12 +3,27 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
+import type { ComponentType } from "react";
 
-const navItems: { href: Route; label: string; icon: string; primary?: boolean }[] = [
-  { href: "/opportunities", label: "Возможности", icon: "⌂" },
-  { href: "/create", label: "Создать", icon: "+", primary: true },
-  { href: "/connections", label: "Связи", icon: "◎" },
-  { href: "/profile", label: "Профиль", icon: "○" }
+import {
+  NavIconConnections,
+  NavIconCreate,
+  NavIconOpportunities,
+  NavIconProfile
+} from "@/components/layout/nav-icons";
+
+type IconComponent = ComponentType<{ size?: number }>;
+
+const navItems: {
+  href: Route;
+  label: string;
+  Icon: IconComponent;
+  primary?: boolean;
+}[] = [
+  { href: "/opportunities", label: "Возможности", Icon: NavIconOpportunities },
+  { href: "/create", label: "Создать", Icon: NavIconCreate, primary: true },
+  { href: "/connections", label: "Связи", Icon: NavIconConnections },
+  { href: "/profile", label: "Профиль", Icon: NavIconProfile }
 ];
 
 export function ShellNav() {
@@ -19,6 +34,7 @@ export function ShellNav() {
       {navItems.map((item) => {
         const isActive =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const Icon = item.Icon;
 
         return (
           <Link
@@ -29,7 +45,7 @@ export function ShellNav() {
             href={item.href}
           >
             <span className="shell-nav-icon" aria-hidden="true">
-              {item.icon}
+              <Icon size={item.primary ? 28 : 24} />
             </span>
             <span className="shell-nav-label">{item.label}</span>
           </Link>

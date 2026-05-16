@@ -62,11 +62,28 @@ export type SerializedConnectionsScreenData = {
   ended: SerializedConnectionSummary[];
 };
 
+export type SerializedInteractionOtherProfile = {
+  name: string;
+  courseInfo: string | null;
+  skills: string[];
+};
+
+export type SerializedInteractionRequestSummary = {
+  scenario: RequestScenario;
+  title: string;
+  format: string | null;
+  expiresAt: string | null;
+  comment: string | null;
+  roles: string[];
+};
+
 export type SerializedInteractionDetail = SerializedInteractionSummary & {
   canAccept: boolean;
   canDecline: boolean;
   targetRequestId: string | null;
   sourceRequestId: string | null;
+  otherProfile: SerializedInteractionOtherProfile | null;
+  requestSummary: SerializedInteractionRequestSummary | null;
 };
 
 export type SerializedConnectionDetail = SerializedConnectionSummary & {
