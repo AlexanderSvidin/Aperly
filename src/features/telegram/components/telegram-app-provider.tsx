@@ -70,7 +70,8 @@ async function clearServerSessionAndReload() {
 
 export function TelegramAppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [session, setSession] = useState<TelegramRuntimeSession>(defaultSession);
+  const [session, setSession] =
+    useState<TelegramRuntimeSession>(defaultSession);
   // Starts true on both server and client so the first render is identical
   // (no hydration mismatch).  Becomes false once detection resolves.
   const [isDetecting, setIsDetecting] = useState(true);
@@ -107,7 +108,18 @@ export function TelegramAppProvider({ children }: { children: ReactNode }) {
       webApp.expand();
       applyTelegramTheme(webApp);
 
-      scheduleSessionUpdate(buildTelegramRuntimeSession(webApp));
+      const nextSession = buildTelegramRuntimeSession(webApp);
+
+      if (
+        process.env.NODE_ENV !== "production" &&
+        clientEnv.NEXT_PUBLIC_ENABLE_DEV_TELEGRAM_FALLBACK &&
+        !nextSession.initData &&
+        !nextSession.user
+      ) {
+        return false;
+      }
+
+      scheduleSessionUpdate(nextSession);
       return true;
     };
 
@@ -189,9 +201,9 @@ export function TelegramAppProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const payload = (await response.json().catch(() => null)) as
-        | MeResponse
-        | null;
+      const payload = (await response
+        .json()
+        .catch(() => null)) as MeResponse | null;
 
       if (
         payload?.authenticated &&

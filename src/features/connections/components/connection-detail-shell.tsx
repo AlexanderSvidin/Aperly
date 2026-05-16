@@ -40,11 +40,9 @@ export function ConnectionDetailShell({
         },
         body: JSON.stringify({ action: "END" })
       });
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            message?: string;
-          }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+      } | null;
 
       if (!response.ok) {
         setActionState({
@@ -64,44 +62,19 @@ export function ConnectionDetailShell({
 
   return (
     <section className="screen-stack">
-      <section className="surface-card screen-stack">
+      <section className="surface-card connection-hero-card">
         <div className="screen-copy">
-          <p className="card-eyebrow">Активная связь</p>
-          <h1 className="screen-title">{connection.title}</h1>
-          <p className="screen-description">{connection.otherUserName}</p>
-        </div>
-
-        <div className="match-badge-row">
-          <span className="status-pill">
+          <p className="card-eyebrow">
             {scenarioLabelByValue[connection.scenario]}
-          </span>
-          <span
-            className="tone-pill"
-            data-tone={connection.status === "ACTIVE" ? "success" : "neutral"}
-          >
-            {connection.status === "ACTIVE" ? "Активна" : "Завершена"}
-          </span>
-        </div>
-      </section>
-
-      <section className="surface-card screen-stack">
-        <div className="screen-copy">
-          <p className="card-eyebrow">Telegram handoff</p>
-          <h2 className="card-title">
-            {connection.canOpenTelegram && connection.telegramUrl
-              ? "Написать в Telegram"
-              : connection.canOpenTelegram
-                ? "Username не найден"
-                : "Связь уже не активна"}
-          </h2>
-          <p className="card-body-copy">
-            {connection.canOpenTelegram && connection.telegramUrl
-              ? "Откроем личный чат в Telegram."
-              : connection.canOpenTelegram
-                ? "Чтобы открыть личный чат, пользователю нужен username в Telegram."
-                : "Контакт был доступен только в активной связи."}
           </p>
+          <h1 className="screen-title">{connection.otherUserName}</h1>
+          <p className="screen-description">{connection.title}</p>
+          <p className="card-body-copy">{connection.subtitle}</p>
         </div>
+
+        <span className="connection-active-status">
+          {connection.status === "ACTIVE" ? "Связь активна" : "Связь завершена"}
+        </span>
 
         {connection.canOpenTelegram && !connection.telegramUrl ? (
           <div className="feedback-box">
@@ -124,10 +97,10 @@ export function ConnectionDetailShell({
           </div>
         ) : null}
 
-        <div className="card-actions-row card-actions-row-inline">
+        <div className="connection-actions">
           {connection.canOpenTelegram && connection.telegramUrl ? (
             <a
-              className={buttonClassName()}
+              className={buttonClassName({ fullWidth: true })}
               href={connection.telegramUrl}
               rel="noreferrer"
               target="_blank"
@@ -135,9 +108,17 @@ export function ConnectionDetailShell({
               Написать в Telegram
             </a>
           ) : null}
+          {connection.canOpenTelegram && connection.telegramUrl ? (
+            <p className="connection-telegram-caption">
+              Откроем личный чат в Telegram
+            </p>
+          ) : null}
           {connection.canOpenTelegram && !connection.telegramUrl ? (
             <Link
-              className={buttonClassName({ variant: "secondary" })}
+              className={buttonClassName({
+                fullWidth: true,
+                variant: "secondary"
+              })}
               href="/connections"
             >
               Понятно
@@ -154,12 +135,14 @@ export function ConnectionDetailShell({
               Завершить связь
             </Button>
           ) : null}
-          <Link
-            className={buttonClassName({ variant: "secondary" })}
-            href="/connections"
-          >
-            К связям
-          </Link>
+        </div>
+      </section>
+
+      <section className="surface-card screen-stack">
+        <div className="screen-copy">
+          <p className="card-eyebrow">Мой запрос</p>
+          <p className="card-body-copy">{connection.title}</p>
+          <p className="card-body-copy">{connection.subtitle}</p>
         </div>
       </section>
     </section>

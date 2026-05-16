@@ -5,10 +5,7 @@ import { redirect } from "next/navigation";
 import { buttonClassName } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DeleteProfilePanel } from "@/features/profile/components/delete-profile-panel";
-import {
-  collaborationRoleOptions,
-  requestStatusLabels
-} from "@/features/requests/lib/request-options";
+import { collaborationRoleOptions } from "@/features/requests/lib/request-options";
 import type { SerializedRequest } from "@/features/requests/lib/request-schema";
 import { getProgramLabel } from "@/features/study/lib/study-catalog";
 import { requirePageUser } from "@/server/services/auth/current-user";
@@ -43,11 +40,26 @@ function collectRequestRoles(requests: SerializedRequest[]) {
   return [...new Set(roles)].map((role) => roleLabelByValue[role] ?? role);
 }
 
-function MenuLink({ href, label }: { href: Route; label: string }) {
+function getInitial(name: string | null | undefined) {
+  return (name?.trim().charAt(0) || "A").toUpperCase();
+}
+
+function MenuLink({
+  count,
+  href,
+  label
+}: {
+  count?: number;
+  href: Route;
+  label: string;
+}) {
   return (
     <Link className="profile-menu-row" href={href}>
       <span>{label}</span>
-      <span aria-hidden="true">›</span>
+      <span className="profile-menu-trailing">
+        {typeof count === "number" ? <span>{count}</span> : null}
+        <span aria-hidden="true">›</span>
+      </span>
     </Link>
   );
 }
@@ -67,13 +79,7 @@ function ValueRow({
     <div className="profile-value-row">
       <p className="field-label">{label}</p>
       {values.length > 0 ? (
-        <div className="chip-row">
-          {values.map((value) => (
-            <span className="info-chip" key={value}>
-              {value}
-            </span>
-          ))}
-        </div>
+        <p className="profile-value-text">{values.join(" · ")}</p>
       ) : actionHref && actionLabel ? (
         <Link className="soft-cta-link" href={actionHref}>
           {actionLabel}
@@ -130,26 +136,40 @@ export default async function ProfilePage() {
   const roles = collectRequestRoles(requests);
   const displayName = profile?.fullName ?? editorData.initialValues.fullName;
   const program = formatProgram(profile?.program);
+  const activeRequestCount = requests.filter(
+    (request) => request.status === "ACTIVE"
+  ).length;
 
   return (
     <section className="screen-stack">
-      <section className="surface-card screen-stack">
-        <div className="screen-copy">
-          <p className="card-eyebrow">Карточка</p>
-          <h2 className="screen-title">{displayName || "Студент HSE Perm"}</h2>
-          <p className="screen-description">
-            {[profile?.campus ?? "Вуз не указан", formatCourse(profile?.courseYear)]
-              .filter(Boolean)
-              .join(", ")}
-          </p>
-          <p className="card-body-copy">
-            {program ? program : "Направление или программа не указаны"}
-          </p>
+      <section className="surface-card profile-summary-card">
+        <span className="profile-avatar" aria-hidden="true">
+          {getInitial(displayName)}
+        </span>
+        <div className="profile-summary-copy">
+          <div className="screen-copy">
+            <h2 className="screen-title">
+              {displayName || "Студент HSE Perm"}
+            </h2>
+            <p className="screen-description">
+              {[
+                profile?.campus ?? "Вуз не указан",
+                formatCourse(profile?.courseYear)
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+            <p className="card-body-copy">
+              {program ? program : "Направление или программа не указаны"}
+            </p>
+          </div>
+          <Link
+            className={buttonClassName({ variant: "secondary" })}
+            href="/profile/edit"
+          >
+            Редактировать
+          </Link>
         </div>
-
-        <Link className={buttonClassName({ fullWidth: true })} href="/profile/edit">
-          Редактировать
-        </Link>
       </section>
 
       <section className="surface-card screen-stack">
@@ -185,12 +205,18 @@ export default async function ProfilePage() {
         </div>
 
         <div className="profile-menu-list">
-          <MenuLink href="/profile/requests" label="Мои запросы" />
+          <MenuLink
+            count={activeRequestCount}
+            href="/profile/requests"
+            label="Мои запросы"
+          />
           <MenuLink href="/profile/archive" label="Архив" />
           <MenuLink href="/profile/edit/telegram" label="Telegram-контакт" />
           <a className="profile-menu-row" href="#delete-account">
             <span>Удалить аккаунт</span>
-            <span aria-hidden="true">›</span>
+            <span className="profile-menu-trailing" aria-hidden="true">
+              ›
+            </span>
           </a>
         </div>
       </section>
@@ -198,12 +224,6 @@ export default async function ProfilePage() {
       <div id="delete-account">
         <DeleteProfilePanel />
       </div>
-
-      <p className="helper-text">
-        Активных запросов:{" "}
-        {requests.filter((request) => request.status === "ACTIVE").length}.{" "}
-        {requestStatusLabels.ACTIVE}
-      </p>
     </section>
   );
 }

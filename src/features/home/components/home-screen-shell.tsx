@@ -15,7 +15,6 @@ import type {
 } from "@/features/home/lib/home-types";
 import { RespondSheet } from "@/features/opportunities/components/respond-sheet";
 import { scenarioLabelByValue } from "@/features/matching/lib/match-options";
-import { formatRequestDate } from "@/features/requests/lib/request-options";
 import type { RequestScenario } from "@/features/requests/lib/request-schema";
 
 type HomeScreenShellProps = {
@@ -42,15 +41,6 @@ function buildOpportunityHref(opportunity: SerializedHomeOpportunity): Route {
   return `/opportunities/${opportunity.id}` as Route;
 }
 
-function formatAuthorMeta(opportunity: SerializedHomeOpportunity) {
-  const parts = [
-    opportunity.author.program,
-    opportunity.author.courseYear ? `${opportunity.author.courseYear} курс` : null
-  ].filter(Boolean);
-
-  return parts.length > 0 ? parts.join(", ") : "Профиль заполнен частично";
-}
-
 export function HomeScreenShell({
   initialData,
   showWelcomeSelector = false,
@@ -74,8 +64,7 @@ export function HomeScreenShell({
     [activeFilter, initialData.opportunities]
   );
 
-  const preferredScenario =
-    activeFilter === "ALL" ? undefined : activeFilter;
+  const preferredScenario = activeFilter === "ALL" ? undefined : activeFilter;
 
   function handleRespondSuccess(requestId: string) {
     setRespondedRequestIds((current) =>
@@ -94,7 +83,11 @@ export function HomeScreenShell({
         </p>
       </div>
 
-      <div className="home-feed-tabs" role="tablist" aria-label="Фильтр возможностей">
+      <div
+        className="home-feed-tabs"
+        role="tablist"
+        aria-label="Фильтр возможностей"
+      >
         {feedTabs.map((tab) => (
           <button
             key={tab.value}
@@ -122,7 +115,9 @@ export function HomeScreenShell({
       ) : (
         <div className="opportunity-list">
           {visibleOpportunities.map((opportunity) => {
-            const hasJustResponded = respondedRequestIds.includes(opportunity.id);
+            const hasJustResponded = respondedRequestIds.includes(
+              opportunity.id
+            );
             const isRespondable =
               opportunity.responseState.status === "NONE" && !hasJustResponded;
             const statusLabel = hasJustResponded
@@ -138,7 +133,10 @@ export function HomeScreenShell({
                 >
                   <div className="opportunity-card-head">
                     <span className="scenario-tag">
-                      <ScenarioIconBadge scenario={opportunity.scenario} variant="inline" />
+                      <ScenarioIconBadge
+                        scenario={opportunity.scenario}
+                        variant="inline"
+                      />
                       {scenarioLabelByValue[opportunity.scenario]}
                     </span>
                   </div>
@@ -159,19 +157,11 @@ export function HomeScreenShell({
                       </span>
                     ) : null}
                     {opportunity.format ? (
-                      <span className="meta-chip-soft">{opportunity.format}</span>
+                      <span className="meta-chip-soft">
+                        {opportunity.format}
+                      </span>
                     ) : null}
                   </div>
-
-                  <div className="opportunity-author">
-                    <strong>{opportunity.author.name}</strong>
-                    <span>{formatAuthorMeta(opportunity)}</span>
-                  </div>
-
-                  <p className="helper-text">{opportunity.relevanceReason}</p>
-                  <p className="helper-text">
-                    Активно до {formatRequestDate(opportunity.expiresAt)}
-                  </p>
                 </Link>
 
                 {isRespondable ? (
@@ -184,14 +174,21 @@ export function HomeScreenShell({
                 ) : opportunity.responseState.connectionId ? (
                   <Link
                     className={buttonClassName({ fullWidth: true })}
-                    href={`/connections/${opportunity.responseState.connectionId}` as Route}
+                    href={
+                      `/connections/${opportunity.responseState.connectionId}` as Route
+                    }
                   >
                     {opportunity.responseState.label}
                   </Link>
                 ) : (
-                  <Button disabled fullWidth variant="secondary">
-                    {statusLabel}
-                  </Button>
+                  <div className="opportunity-pending-state">
+                    <Button disabled fullWidth variant="secondary">
+                      {statusLabel}
+                    </Button>
+                    {statusLabel === "Ждём ответ" ? (
+                      <p className="helper-text">Отклик отправлен</p>
+                    ) : null}
+                  </div>
                 )}
               </article>
             );

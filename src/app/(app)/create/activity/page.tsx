@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -72,12 +73,10 @@ export default function CreateActivityPage() {
         }
       })
     });
-    const payload = (await response.json().catch(() => null)) as
-      | {
-          request?: { id: string };
-          message?: string;
-        }
-      | null;
+    const payload = (await response.json().catch(() => null)) as {
+      request?: { id: string };
+      message?: string;
+    } | null;
 
     setIsSubmitting(false);
 
@@ -92,6 +91,9 @@ export default function CreateActivityPage() {
   return (
     <section className="screen-stack">
       <section className="surface-card screen-stack">
+        <Link className="back-link" href="/create">
+          ←
+        </Link>
         <div className="screen-copy">
           <p className="card-eyebrow">Создать</p>
           <h1 className="screen-title">Активность</h1>
@@ -104,54 +106,103 @@ export default function CreateActivityPage() {
       <section className="surface-card screen-stack">
         <label className="field-stack">
           <span className="field-label">Название</span>
-          <input className="field-input" onChange={(event) => setTitle(event.target.value)} value={title} />
+          <input
+            className="field-input"
+            onChange={(event) => setTitle(event.target.value)}
+            value={title}
+          />
         </label>
 
         <label className="field-stack">
           <span className="field-label">Тип</span>
-          <select className="field-input" onChange={(event) => setActivitySubtype(event.target.value as typeof activitySubtype)} value={activitySubtype}>
+          <select
+            className="field-input"
+            onChange={(event) =>
+              setActivitySubtype(event.target.value as typeof activitySubtype)
+            }
+            value={activitySubtype}
+          >
             {subtypeOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
         </label>
 
         <label className="field-stack">
           <span className="field-label">Когда</span>
-          <input className="field-input" onChange={(event) => setTime(event.target.value)} type="datetime-local" value={time} />
+          <input
+            className="field-input"
+            onChange={(event) => setTime(event.target.value)}
+            type="datetime-local"
+            value={time}
+          />
         </label>
 
         <label className="field-stack">
           <span className="field-label">Формат</span>
-          <select className="field-input" onChange={(event) => setPreferredFormat(event.target.value as typeof preferredFormat)} value={preferredFormat}>
+          <select
+            className="field-input"
+            onChange={(event) =>
+              setPreferredFormat(event.target.value as typeof preferredFormat)
+            }
+            value={preferredFormat}
+          >
             {formatOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
         </label>
 
         <label className="field-stack">
           <span className="field-label">Место</span>
-          <input className="field-input" onChange={(event) => setLocation(event.target.value)} value={location} />
+          <input
+            className="field-input"
+            onChange={(event) => setLocation(event.target.value)}
+            value={location}
+          />
         </label>
 
         <label className="field-stack">
           <span className="field-label">Сколько людей</span>
-          <input className="field-input" min="1" max="50" onChange={(event) => setPeopleCount(event.target.value)} type="number" value={peopleCount} />
+          <input
+            className="field-input"
+            min="1"
+            max="50"
+            onChange={(event) => setPeopleCount(event.target.value)}
+            type="number"
+            value={peopleCount}
+          />
         </label>
 
         <label className="field-stack">
           <span className="field-label">Регулярность</span>
-          <select className="field-input" onChange={(event) => setRecurrence(event.target.value as typeof recurrence)} value={recurrence}>
+          <select
+            className="field-input"
+            onChange={(event) =>
+              setRecurrence(event.target.value as typeof recurrence)
+            }
+            value={recurrence}
+          >
             {recurrenceOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
         </label>
 
         <label className="field-stack">
           <span className="field-label">Комментарий</span>
-          <textarea className="field-textarea" onChange={(event) => setComment(event.target.value)} rows={4} value={comment} />
+          <textarea
+            className="field-textarea"
+            onChange={(event) => setComment(event.target.value)}
+            rows={4}
+            value={comment}
+          />
         </label>
 
         {message ? (
@@ -160,8 +211,14 @@ export default function CreateActivityPage() {
           </div>
         ) : null}
 
-        <Button disabled={title.trim().length < 2 || isSubmitting} fullWidth isLoading={isSubmitting} loadingLabel="Создаём..." onClick={submit}>
-          Создать активность
+        <Button
+          disabled={title.trim().length < 2 || isSubmitting}
+          fullWidth
+          isLoading={isSubmitting}
+          loadingLabel="Создаём..."
+          onClick={submit}
+        >
+          Создать запрос
         </Button>
       </section>
     </section>

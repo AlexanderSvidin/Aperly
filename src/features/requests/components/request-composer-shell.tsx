@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 
-import { Button, buttonClassName } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { minuteToTimeValue } from "@/features/profile/lib/profile-options";
 import {
@@ -61,7 +61,14 @@ type RequestComposerShellProps = {
 
 type AvailabilityDraft = {
   id: string;
-  dayOfWeek: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+  dayOfWeek:
+    | "MONDAY"
+    | "TUESDAY"
+    | "WEDNESDAY"
+    | "THURSDAY"
+    | "FRIDAY"
+    | "SATURDAY"
+    | "SUNDAY";
   startTime: string;
   endTime: string;
 };
@@ -73,9 +80,9 @@ type CaseDraft = {
   details: {
     eventName: string;
     deadline: string;
-    neededRoles: typeof collaborationRoleOptions[number]["value"][];
+    neededRoles: (typeof collaborationRoleOptions)[number]["value"][];
     teamGapSize: string;
-    preferredFormat: typeof requestFormatOptions[number]["value"];
+    preferredFormat: (typeof requestFormatOptions)[number]["value"];
   };
 };
 
@@ -85,10 +92,10 @@ type ProjectDraft = {
   details: {
     projectTitle: string;
     shortDescription: string;
-    stage: typeof projectStageOptions[number]["value"];
-    neededRoles: typeof collaborationRoleOptions[number]["value"][];
-    expectedCommitment: typeof commitmentOptions[number]["value"];
-    preferredFormat: typeof requestFormatOptions[number]["value"];
+    stage: (typeof projectStageOptions)[number]["value"];
+    neededRoles: (typeof collaborationRoleOptions)[number]["value"][];
+    expectedCommitment: (typeof commitmentOptions)[number]["value"];
+    preferredFormat: (typeof requestFormatOptions)[number]["value"];
   };
 };
 
@@ -100,9 +107,9 @@ type StudyDraft = {
     customSubjectName: string;
     currentContext: string;
     goal: string;
-    desiredFrequency: typeof studyFrequencyOptions[number]["value"];
-    preferredTime: typeof preferredTimeOptions[number]["value"];
-    preferredFormat: typeof requestFormatOptions[number]["value"];
+    desiredFrequency: (typeof studyFrequencyOptions)[number]["value"];
+    preferredTime: (typeof preferredTimeOptions)[number]["value"];
+    preferredFormat: (typeof requestFormatOptions)[number]["value"];
   };
 };
 
@@ -355,7 +362,10 @@ function getRequestStatusBadge(request: SerializedRequest) {
   };
 }
 
-function upsertRequestInList(requests: SerializedRequest[], nextRequest: SerializedRequest) {
+function upsertRequestInList(
+  requests: SerializedRequest[],
+  nextRequest: SerializedRequest
+) {
   const filtered = requests.filter((request) => request.id !== nextRequest.id);
 
   if (nextRequest.status === "DELETED") {
@@ -411,14 +421,18 @@ export function RequestComposerShell({
   const [selectedScenario, setSelectedScenario] =
     useState<RequestScenario | null>(effectiveInitialScenario);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(
-    effectiveInitialScenario ? activeRequestsByScenario.get(effectiveInitialScenario)?.id ?? null : null
+    effectiveInitialScenario
+      ? (activeRequestsByScenario.get(effectiveInitialScenario)?.id ?? null)
+      : null
   );
   const [draft, setDraft] = useState<RequestDraft | null>(() => {
     if (!effectiveInitialScenario) {
       return null;
     }
 
-    const activeRequest = activeRequestsByScenario.get(effectiveInitialScenario);
+    const activeRequest = activeRequestsByScenario.get(
+      effectiveInitialScenario
+    );
 
     return activeRequest
       ? createDraftFromRequest(activeRequest)
@@ -428,7 +442,9 @@ export function RequestComposerShell({
     studyDefaults.studyLevel
   );
   const [studyProgramId, setStudyProgramId] = useState(studyDefaults.programId);
-  const [studyCourseYear, setStudyCourseYear] = useState(studyDefaults.courseYear);
+  const [studyCourseYear, setStudyCourseYear] = useState(
+    studyDefaults.courseYear
+  );
 
   const formCardRef = useRef<HTMLDivElement>(null);
 
@@ -457,7 +473,10 @@ export function RequestComposerShell({
 
   function scrollToForm() {
     setTimeout(() => {
-      formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      formCardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
     }, 50);
   }
 
@@ -488,7 +507,10 @@ export function RequestComposerShell({
 
     setDraft({
       ...draft,
-      availabilitySlots: [...draft.availabilitySlots, createDefaultAvailabilitySlot()]
+      availabilitySlots: [
+        ...draft.availabilitySlots,
+        createDefaultAvailabilitySlot()
+      ]
     });
   }
 
@@ -584,7 +606,9 @@ export function RequestComposerShell({
       setFeedback(null);
       setActionStatus(actionKey, {
         status: "loading",
-        message: editingRequestId ? "Сохраняем изменения..." : "Создаём запрос..."
+        message: editingRequestId
+          ? "Сохраняем изменения..."
+          : "Создаём запрос..."
       });
 
       const payload =
@@ -635,21 +659,21 @@ export function RequestComposerShell({
               };
 
       const response = await mutateRequestList(
-        editingRequestId ? `/api/requests/${editingRequestId}` : "/api/requests",
+        editingRequestId
+          ? `/api/requests/${editingRequestId}`
+          : "/api/requests",
         editingRequestId ? "PATCH" : "POST",
         payload
       );
 
-      const result = (await response.json().catch(() => null)) as
-        | {
-            request?: SerializedRequest;
-            message?: string;
-            issues?: unknown[];
-            meta?: {
-              requestId?: string;
-            };
-          }
-        | null;
+      const result = (await response.json().catch(() => null)) as {
+        request?: SerializedRequest;
+        message?: string;
+        issues?: unknown[];
+        meta?: {
+          requestId?: string;
+        };
+      } | null;
 
       if (!response.ok || !result?.request) {
         if (result?.meta?.requestId) {
@@ -725,12 +749,10 @@ export function RequestComposerShell({
         `/api/requests/${requestId}/archive`,
         "POST"
       );
-      const result = (await response.json().catch(() => null)) as
-        | {
-            request?: SerializedRequest;
-            message?: string;
-          }
-        | null;
+      const result = (await response.json().catch(() => null)) as {
+        request?: SerializedRequest;
+        message?: string;
+      } | null;
 
       if (!response.ok || !result?.request) {
         const message = result?.message ?? "Не удалось архивировать запрос.";
@@ -783,15 +805,14 @@ export function RequestComposerShell({
         `/api/requests/${requestId}/pause`,
         "POST"
       );
-      const result = (await response.json().catch(() => null)) as
-        | {
-            request?: SerializedRequest;
-            message?: string;
-          }
-        | null;
+      const result = (await response.json().catch(() => null)) as {
+        request?: SerializedRequest;
+        message?: string;
+      } | null;
 
       if (!response.ok || !result?.request) {
-        const message = result?.message ?? "Не удалось поставить запрос на паузу.";
+        const message =
+          result?.message ?? "Не удалось поставить запрос на паузу.";
         setActionStatus(actionKey, {
           status: "error",
           message
@@ -824,7 +845,11 @@ export function RequestComposerShell({
   }
 
   function handleClose(requestId: string) {
-    if (!window.confirm("Закрыть запрос как решённый? Активный поиск остановится.")) {
+    if (
+      !window.confirm(
+        "Закрыть запрос как решённый? Активный поиск остановится."
+      )
+    ) {
       return;
     }
 
@@ -845,12 +870,10 @@ export function RequestComposerShell({
         `/api/requests/${requestId}/close`,
         "POST"
       );
-      const result = (await response.json().catch(() => null)) as
-        | {
-            request?: SerializedRequest;
-            message?: string;
-          }
-        | null;
+      const result = (await response.json().catch(() => null)) as {
+        request?: SerializedRequest;
+        message?: string;
+      } | null;
 
       if (!response.ok || !result?.request) {
         const message = result?.message ?? "Не удалось закрыть запрос.";
@@ -903,12 +926,10 @@ export function RequestComposerShell({
         `/api/requests/${requestId}/renew`,
         "POST"
       );
-      const result = (await response.json().catch(() => null)) as
-        | {
-            request?: SerializedRequest;
-            message?: string;
-          }
-        | null;
+      const result = (await response.json().catch(() => null)) as {
+        request?: SerializedRequest;
+        message?: string;
+      } | null;
 
       if (!response.ok || !result?.request) {
         const message = result?.message ?? "Не удалось обновить запрос.";
@@ -947,14 +968,15 @@ export function RequestComposerShell({
     : undefined;
 
   const scenarioLabel = singleScenario
-    ? (requestScenarioOptions.find((o) => o.value === singleScenario)?.label ?? singleScenario)
+    ? (requestScenarioOptions.find((o) => o.value === singleScenario)?.label ??
+      singleScenario)
     : null;
 
   return (
     <section className="screen-stack">
-      <section className="surface-card screen-stack">
+      <section className="screen-heading">
         {singleScenario ? (
-          <Link className={buttonClassName({ variant: "ghost" })} href="/create">
+          <Link className="back-link" href="/create">
             ←
           </Link>
         ) : null}
@@ -975,123 +997,135 @@ export function RequestComposerShell({
       </section>
 
       {!singleScenario ? (
-      <div className="screen-grid">
-        {requestScenarioOptions.map((scenario) => {
-          const request = latestRequestsByScenario.get(scenario.value);
-          const badge = request ? getRequestStatusBadge(request) : null;
-          const archiveKey = request
-            ? buildRequestActionKey("archive", request.id)
-            : "";
-          const closeKey = request
-            ? buildRequestActionKey("close", request.id)
-            : "";
-          const pauseKey = request
-            ? buildRequestActionKey("pause", request.id)
-            : "";
-          const renewKey = request
-            ? buildRequestActionKey("renew", request.id)
-            : "";
+        <div className="screen-grid">
+          {requestScenarioOptions.map((scenario) => {
+            const request = latestRequestsByScenario.get(scenario.value);
+            const badge = request ? getRequestStatusBadge(request) : null;
+            const archiveKey = request
+              ? buildRequestActionKey("archive", request.id)
+              : "";
+            const closeKey = request
+              ? buildRequestActionKey("close", request.id)
+              : "";
+            const pauseKey = request
+              ? buildRequestActionKey("pause", request.id)
+              : "";
+            const renewKey = request
+              ? buildRequestActionKey("renew", request.id)
+              : "";
 
-          return (
-            <Card key={scenario.value} eyebrow="Сценарий" title={scenario.label} data-selected={selectedScenario === scenario.value ? "true" : undefined}>
-              <div className="screen-stack">
-                <span
-                  className="tone-pill"
-                  data-tone={badge?.tone ?? "neutral"}
-                >
-                  {badge?.label ?? "Черновик"}
-                </span>
-
-                <p className="card-body-copy">
-                  {request
-                    ? summarizeRequest(request)
-                    : "Создайте короткий запрос и опубликуйте возможность."}
-                </p>
-
-                {request ? (
-                  <p className="helper-text">{describeRequest(request)}</p>
-                ) : null}
-
-                <div className="request-card-actions">
-                  <Button
-                    fullWidth
-                    onClick={() => {
-                      if (scenario.value === "ACTIVITY") {
-                        router.push("/create/activity");
-                        return;
-                      }
-
-                      if (request?.status === "ACTIVE") {
-                        startEditingRequest(request);
-                        scrollToForm();
-                        return;
-                      }
-
-                      selectScenario(scenario.value);
-                      scrollToForm();
-                    }}
-                    variant={request?.status === "ACTIVE" ? "secondary" : "primary"}
+            return (
+              <Card
+                key={scenario.value}
+                eyebrow="Сценарий"
+                title={scenario.label}
+                data-selected={
+                  selectedScenario === scenario.value ? "true" : undefined
+                }
+              >
+                <div className="screen-stack">
+                  <span
+                    className="tone-pill"
+                    data-tone={badge?.tone ?? "neutral"}
                   >
-                    {request?.status === "ACTIVE" ? "Редактировать" : "Создать запрос"}
-                  </Button>
+                    {badge?.label ?? "Черновик"}
+                  </span>
 
-                  {request?.status === "ACTIVE" ? (
-                    <Button
-                      disabled={hasBusyAction()}
-                      fullWidth
-                      isLoading={isActionBusy(pauseKey)}
-                      loadingLabel="Ставим на паузу..."
-                      onClick={() => handlePause(request.id)}
-                      variant="ghost"
-                    >
-                      Пауза
-                    </Button>
-                  ) : null}
-
-                  {request?.status === "ACTIVE" ? (
-                    <Button
-                      disabled={hasBusyAction()}
-                      fullWidth
-                      isLoading={isActionBusy(closeKey)}
-                      loadingLabel="Закрываем..."
-                      onClick={() => handleClose(request.id)}
-                      variant="ghost"
-                    >
-                      Закрыть
-                    </Button>
-                  ) : null}
+                  <p className="card-body-copy">
+                    {request
+                      ? summarizeRequest(request)
+                      : "Создайте короткий запрос и опубликуйте возможность."}
+                  </p>
 
                   {request ? (
-                    <Button
-                      disabled={hasBusyAction()}
-                      fullWidth
-                      isLoading={isActionBusy(archiveKey)}
-                      loadingLabel="Архивируем..."
-                      onClick={() => handleArchive(request.id)}
-                      variant="ghost"
-                    >
-                      Архивировать
-                    </Button>
+                    <p className="helper-text">{describeRequest(request)}</p>
                   ) : null}
 
-                  {request?.status === "EXPIRED" || request?.status === "PAUSED" ? (
+                  <div className="request-card-actions">
                     <Button
-                      disabled={hasBusyAction()}
                       fullWidth
-                      isLoading={isActionBusy(renewKey)}
-                      loadingLabel="Возобновляем..."
-                      onClick={() => handleRenew(request.id)}
-                      variant="secondary"
+                      onClick={() => {
+                        if (scenario.value === "ACTIVITY") {
+                          router.push("/create/activity");
+                          return;
+                        }
+
+                        if (request?.status === "ACTIVE") {
+                          startEditingRequest(request);
+                          scrollToForm();
+                          return;
+                        }
+
+                        selectScenario(scenario.value);
+                        scrollToForm();
+                      }}
+                      variant={
+                        request?.status === "ACTIVE" ? "secondary" : "primary"
+                      }
                     >
-                      Возобновить
+                      {request?.status === "ACTIVE"
+                        ? "Редактировать"
+                        : "Создать запрос"}
                     </Button>
-                  ) : null}
+
+                    {request?.status === "ACTIVE" ? (
+                      <Button
+                        disabled={hasBusyAction()}
+                        fullWidth
+                        isLoading={isActionBusy(pauseKey)}
+                        loadingLabel="Ставим на паузу..."
+                        onClick={() => handlePause(request.id)}
+                        variant="ghost"
+                      >
+                        Пауза
+                      </Button>
+                    ) : null}
+
+                    {request?.status === "ACTIVE" ? (
+                      <Button
+                        disabled={hasBusyAction()}
+                        fullWidth
+                        isLoading={isActionBusy(closeKey)}
+                        loadingLabel="Закрываем..."
+                        onClick={() => handleClose(request.id)}
+                        variant="ghost"
+                      >
+                        Закрыть
+                      </Button>
+                    ) : null}
+
+                    {request ? (
+                      <Button
+                        disabled={hasBusyAction()}
+                        fullWidth
+                        isLoading={isActionBusy(archiveKey)}
+                        loadingLabel="Архивируем..."
+                        onClick={() => handleArchive(request.id)}
+                        variant="ghost"
+                      >
+                        Архивировать
+                      </Button>
+                    ) : null}
+
+                    {request?.status === "EXPIRED" ||
+                    request?.status === "PAUSED" ? (
+                      <Button
+                        disabled={hasBusyAction()}
+                        fullWidth
+                        isLoading={isActionBusy(renewKey)}
+                        loadingLabel="Возобновляем..."
+                        onClick={() => handleRenew(request.id)}
+                        variant="secondary"
+                      >
+                        Возобновить
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+              </Card>
+            );
+          })}
+        </div>
       ) : null}
 
       <Card ref={formCardRef} eyebrow="Форма" title="Данные для запроса">
@@ -1142,7 +1176,9 @@ export function RequestComposerShell({
           {!draft ? null : draft.scenario === "CASE" ? (
             <>
               <label className="field-stack">
-                <span className="field-label">Название кейса или чемпионата</span>
+                <span className="field-label">
+                  Название кейса или чемпионата
+                </span>
                 <input
                   className="field-input"
                   onChange={(event) =>
@@ -1207,13 +1243,18 @@ export function RequestComposerShell({
                     <button
                       key={role.value}
                       className="toggle-chip"
-                      data-selected={draft.details.neededRoles.includes(role.value)}
+                      data-selected={draft.details.neededRoles.includes(
+                        role.value
+                      )}
                       onClick={() =>
                         setDraft({
                           ...draft,
                           details: {
                             ...draft.details,
-                            neededRoles: toggleValue(draft.details.neededRoles, role.value)
+                            neededRoles: toggleValue(
+                              draft.details.neededRoles,
+                              role.value
+                            )
                           }
                         })
                       }
@@ -1232,7 +1273,9 @@ export function RequestComposerShell({
                     <button
                       key={format.value}
                       className="toggle-chip"
-                      data-selected={draft.details.preferredFormat === format.value}
+                      data-selected={
+                        draft.details.preferredFormat === format.value
+                      }
                       onClick={() =>
                         setDraft({
                           ...draft,
@@ -1258,7 +1301,10 @@ export function RequestComposerShell({
                 </p>
                 <div className="availability-stack">
                   {draft.availabilitySlots.map((slot) => (
-                    <div key={slot.id} className="availability-row availability-slot-card">
+                    <div
+                      key={slot.id}
+                      className="availability-row availability-slot-card"
+                    >
                       <div className="avail-day-row">
                         <label className="field-stack availability-field">
                           <span className="field-caption">День</span>
@@ -1330,11 +1376,16 @@ export function RequestComposerShell({
                 </div>
 
                 <div className="form-actions-inline">
-                  <Button onClick={addCaseAvailabilitySlot} type="button" variant="secondary">
+                  <Button
+                    onClick={addCaseAvailabilitySlot}
+                    type="button"
+                    variant="secondary"
+                  >
                     Добавить слот
                   </Button>
                   <p className="helper-text">
-                    Обычно хватает 1-3 слотов. Время указывайте в формате часы:минуты.
+                    Обычно хватает 1-3 слотов. Время указывайте в формате
+                    часы:минуты.
                   </p>
                 </div>
               </div>
@@ -1390,7 +1441,8 @@ export function RequestComposerShell({
                         ...draft,
                         details: {
                           ...draft.details,
-                          stage: event.target.value as ProjectDraft["details"]["stage"]
+                          stage: event.target
+                            .value as ProjectDraft["details"]["stage"]
                         }
                       })
                     }
@@ -1413,8 +1465,8 @@ export function RequestComposerShell({
                         ...draft,
                         details: {
                           ...draft.details,
-                          expectedCommitment:
-                            event.target.value as ProjectDraft["details"]["expectedCommitment"]
+                          expectedCommitment: event.target
+                            .value as ProjectDraft["details"]["expectedCommitment"]
                         }
                       })
                     }
@@ -1436,13 +1488,18 @@ export function RequestComposerShell({
                     <button
                       key={role.value}
                       className="toggle-chip"
-                      data-selected={draft.details.neededRoles.includes(role.value)}
+                      data-selected={draft.details.neededRoles.includes(
+                        role.value
+                      )}
                       onClick={() =>
                         setDraft({
                           ...draft,
                           details: {
                             ...draft.details,
-                            neededRoles: toggleValue(draft.details.neededRoles, role.value)
+                            neededRoles: toggleValue(
+                              draft.details.neededRoles,
+                              role.value
+                            )
                           }
                         })
                       }
@@ -1461,7 +1518,9 @@ export function RequestComposerShell({
                     <button
                       key={format.value}
                       className="toggle-chip"
-                      data-selected={draft.details.preferredFormat === format.value}
+                      data-selected={
+                        draft.details.preferredFormat === format.value
+                      }
                       onClick={() =>
                         setDraft({
                           ...draft,
@@ -1499,7 +1558,9 @@ export function RequestComposerShell({
                         ...currentDraft.details,
                         customSubjectName: values[0] ?? "",
                         subjectId:
-                          values.length > 0 ? "" : currentDraft.details.subjectId
+                          values.length > 0
+                            ? ""
+                            : currentDraft.details.subjectId
                       }
                     };
                   })
@@ -1526,9 +1587,13 @@ export function RequestComposerShell({
                 onStudyLevelChange={setStudyLevel}
                 programId={studyProgramId}
                 selectedCustomSubjects={
-                  draft.details.customSubjectName ? [draft.details.customSubjectName] : []
+                  draft.details.customSubjectName
+                    ? [draft.details.customSubjectName]
+                    : []
                 }
-                selectedSubjectIds={draft.details.subjectId ? [draft.details.subjectId] : []}
+                selectedSubjectIds={
+                  draft.details.subjectId ? [draft.details.subjectId] : []
+                }
                 studyLevel={studyLevel}
                 subjects={subjects}
               />
@@ -1583,8 +1648,8 @@ export function RequestComposerShell({
                         ...draft,
                         details: {
                           ...draft.details,
-                          desiredFrequency:
-                            event.target.value as StudyDraft["details"]["desiredFrequency"]
+                          desiredFrequency: event.target
+                            .value as StudyDraft["details"]["desiredFrequency"]
                         }
                       })
                     }
@@ -1607,15 +1672,18 @@ export function RequestComposerShell({
                         ...draft,
                         details: {
                           ...draft.details,
-                          preferredTime:
-                            event.target.value as StudyDraft["details"]["preferredTime"]
+                          preferredTime: event.target
+                            .value as StudyDraft["details"]["preferredTime"]
                         }
                       })
                     }
                     value={draft.details.preferredTime}
                   >
                     {preferredTimeOptions.map((preferredTime) => (
-                      <option key={preferredTime.value} value={preferredTime.value}>
+                      <option
+                        key={preferredTime.value}
+                        value={preferredTime.value}
+                      >
                         {preferredTime.label}
                       </option>
                     ))}
@@ -1630,7 +1698,9 @@ export function RequestComposerShell({
                     <button
                       key={format.value}
                       className="toggle-chip"
-                      data-selected={draft.details.preferredFormat === format.value}
+                      data-selected={
+                        draft.details.preferredFormat === format.value
+                      }
                       onClick={() =>
                         setDraft({
                           ...draft,
@@ -1681,123 +1751,132 @@ export function RequestComposerShell({
         </form>
       </Card>
 
-      <Card eyebrow="История" title="Ваши запросы">
-        {requests.length === 0 ? (
-          <p className="card-body-copy">
-            Создайте первый запрос, чтобы опубликовать возможность по
-            выбранному сценарию и сразу перейти к откликам.
-          </p>
-        ) : (
-          <div className="request-history-list">
-            {requests.map((request) => {
-              const archiveKey = buildRequestActionKey("archive", request.id);
-              const closeKey = buildRequestActionKey("close", request.id);
-              const pauseKey = buildRequestActionKey("pause", request.id);
-              const renewKey = buildRequestActionKey("renew", request.id);
-              const secondaryActionKey =
-                request.status === "EXPIRED" || request.status === "PAUSED"
-                  ? renewKey
-                  : archiveKey;
+      {!singleScenario ? (
+        <Card eyebrow="История" title="Ваши запросы">
+          {requests.length === 0 ? (
+            <p className="card-body-copy">
+              Создайте первый запрос, чтобы опубликовать возможность по
+              выбранному сценарию и сразу перейти к откликам.
+            </p>
+          ) : (
+            <div className="request-history-list">
+              {requests.map((request) => {
+                const archiveKey = buildRequestActionKey("archive", request.id);
+                const closeKey = buildRequestActionKey("close", request.id);
+                const pauseKey = buildRequestActionKey("pause", request.id);
+                const renewKey = buildRequestActionKey("renew", request.id);
+                const secondaryActionKey =
+                  request.status === "EXPIRED" || request.status === "PAUSED"
+                    ? renewKey
+                    : archiveKey;
 
-              return (
-              <div key={request.id} className="request-history-row">
-                <div className="request-history-copy">
-                  <div className="request-history-head">
-                    <strong>{summarizeRequest(request)}</strong>
-                    <span
-                      className="tone-pill"
-                      data-tone={getRequestStatusBadge(request).tone}
-                    >
-                      {getRequestStatusBadge(request).label}
-                    </span>
+                return (
+                  <div key={request.id} className="request-history-row">
+                    <div className="request-history-copy">
+                      <div className="request-history-head">
+                        <strong>{summarizeRequest(request)}</strong>
+                        <span
+                          className="tone-pill"
+                          data-tone={getRequestStatusBadge(request).tone}
+                        >
+                          {getRequestStatusBadge(request).label}
+                        </span>
+                      </div>
+                      <p className="helper-text">
+                        {requestScenarioOptions.find(
+                          (scenario) => scenario.value === request.scenario
+                        )?.label ?? request.scenario}
+                        {". "}
+                        {describeRequest(request)}
+                      </p>
+                      <p className="helper-text">
+                        {request.availabilitySlots.length > 0
+                          ? request.availabilitySlots
+                              .map(
+                                (slot) =>
+                                  `${
+                                    requestDayOfWeekOptions.find(
+                                      (day) => day.value === slot.dayOfWeek
+                                    )?.label ?? slot.dayOfWeek
+                                  } ${minuteRangeToLabel(
+                                    slot.startMinute,
+                                    slot.endMinute
+                                  )}`
+                              )
+                              .join(", ")
+                          : `Активен до ${formatRequestDate(request.expiresAt)}`}
+                      </p>
+                    </div>
+
+                    <div className="request-card-actions">
+                      {request.status === "ACTIVE" ? (
+                        <>
+                          <Button
+                            disabled={hasBusyAction()}
+                            onClick={() => startEditingRequest(request)}
+                            variant="secondary"
+                          >
+                            Редактировать
+                          </Button>
+                          <Button
+                            disabled={hasBusyAction()}
+                            isLoading={isActionBusy(pauseKey)}
+                            loadingLabel="Ставим на паузу..."
+                            onClick={() => handlePause(request.id)}
+                            variant="ghost"
+                          >
+                            Пауза
+                          </Button>
+                          <Button
+                            disabled={hasBusyAction()}
+                            isLoading={isActionBusy(closeKey)}
+                            loadingLabel="Закрываем..."
+                            onClick={() => handleClose(request.id)}
+                            variant="ghost"
+                          >
+                            Закрыть
+                          </Button>
+                          <Button
+                            disabled={hasBusyAction()}
+                            isLoading={isActionBusy(archiveKey)}
+                            loadingLabel="Архивируем..."
+                            onClick={() => handleArchive(request.id)}
+                            variant="ghost"
+                          >
+                            Архивировать
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          disabled={hasBusyAction()}
+                          isLoading={isActionBusy(secondaryActionKey)}
+                          loadingLabel={
+                            request.status === "EXPIRED" ||
+                            request.status === "PAUSED"
+                              ? "Возобновляем..."
+                              : "Архивируем..."
+                          }
+                          onClick={() =>
+                            request.status === "EXPIRED" ||
+                            request.status === "PAUSED"
+                              ? handleRenew(request.id)
+                              : handleArchive(request.id)
+                          }
+                          variant="secondary"
+                        >
+                          {request.status === "EXPIRED"
+                            ? "Возобновить"
+                            : "Архивировать"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <p className="helper-text">
-                    {requestScenarioOptions.find(
-                      (scenario) => scenario.value === request.scenario
-                    )?.label ?? request.scenario}
-                    {". "}
-                    {describeRequest(request)}
-                  </p>
-                  <p className="helper-text">
-                    {request.availabilitySlots.length > 0
-                      ? request.availabilitySlots
-                          .map((slot) =>
-                            `${requestDayOfWeekOptions.find(
-                              (day) => day.value === slot.dayOfWeek
-                            )?.label ?? slot.dayOfWeek} ${minuteRangeToLabel(
-                              slot.startMinute,
-                              slot.endMinute
-                            )}`
-                          )
-                          .join(", ")
-                      : `Активен до ${formatRequestDate(request.expiresAt)}`}
-                  </p>
-                </div>
-
-                <div className="request-card-actions">
-                  {request.status === "ACTIVE" ? (
-                    <>
-                      <Button
-                        disabled={hasBusyAction()}
-                        onClick={() => startEditingRequest(request)}
-                        variant="secondary"
-                      >
-                        Редактировать
-                      </Button>
-                      <Button
-                        disabled={hasBusyAction()}
-                        isLoading={isActionBusy(pauseKey)}
-                        loadingLabel="Ставим на паузу..."
-                        onClick={() => handlePause(request.id)}
-                        variant="ghost"
-                      >
-                        Пауза
-                      </Button>
-                      <Button
-                        disabled={hasBusyAction()}
-                        isLoading={isActionBusy(closeKey)}
-                        loadingLabel="Закрываем..."
-                        onClick={() => handleClose(request.id)}
-                        variant="ghost"
-                      >
-                        Закрыть
-                      </Button>
-                      <Button
-                        disabled={hasBusyAction()}
-                        isLoading={isActionBusy(archiveKey)}
-                        loadingLabel="Архивируем..."
-                        onClick={() => handleArchive(request.id)}
-                        variant="ghost"
-                      >
-                        Архивировать
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      disabled={hasBusyAction()}
-                      isLoading={isActionBusy(secondaryActionKey)}
-                      loadingLabel={
-                        request.status === "EXPIRED" || request.status === "PAUSED"
-                          ? "Возобновляем..."
-                          : "Архивируем..."
-                      }
-                      onClick={() =>
-                        request.status === "EXPIRED" || request.status === "PAUSED"
-                          ? handleRenew(request.id)
-                          : handleArchive(request.id)
-                      }
-                      variant="secondary"
-                    >
-                      {request.status === "EXPIRED" ? "Возобновить" : "Архивировать"}
-                    </Button>
-                  )}
-                </div>
-              </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      ) : null}
     </section>
   );
 }

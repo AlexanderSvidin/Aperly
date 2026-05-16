@@ -34,6 +34,7 @@ export function NavIconCreate({ size = 28 }: IconProps) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
+      <circle cx="12" cy="12" r="8.5" />
       <line x1="12" y1="6" x2="12" y2="18" />
       <line x1="6" y1="12" x2="18" y2="12" />
     </svg>

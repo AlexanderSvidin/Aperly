@@ -57,13 +57,21 @@ function formatProfileMeta(match: SerializedMatchListItem) {
   return parts.length > 0 ? parts.join(", ") : "Профиль заполнен частично";
 }
 
+function getInitial(name: string) {
+  return (name.trim().charAt(0) || "A").toUpperCase();
+}
+
 function getExplainableReasons(match: SerializedMatchListItem) {
   const fromDimensions = match.dimensions
-    .filter((dimension) => dimension.score > 0 && reasonLabelByKey[dimension.key])
+    .filter(
+      (dimension) => dimension.score > 0 && reasonLabelByKey[dimension.key]
+    )
     .sort((left, right) => right.score - left.score)
     .map((dimension) => reasonLabelByKey[dimension.key]!);
 
-  return [...new Set(fromDimensions.length > 0 ? fromDimensions : match.reasons)].slice(0, 4);
+  return [
+    ...new Set(fromDimensions.length > 0 ? fromDimensions : match.reasons)
+  ].slice(0, 4);
 }
 
 function CandidateCard({
@@ -82,9 +90,14 @@ function CandidateCard({
   return (
     <article className="match-card">
       <div className="match-card-head">
-        <div className="screen-copy">
-          <h3 className="card-title">{match.candidateProfile.fullName}</h3>
-          <p className="card-body-copy">{formatProfileMeta(match)}</p>
+        <div className="candidate-card-head">
+          <span className="profile-avatar profile-avatar-sm" aria-hidden="true">
+            {getInitial(match.candidateProfile.fullName)}
+          </span>
+          <div className="screen-copy">
+            <h3 className="card-title">{match.candidateProfile.fullName}</h3>
+            <p className="card-body-copy">{formatProfileMeta(match)}</p>
+          </div>
         </div>
         <Link
           className={buttonClassName({ variant: "secondary" })}
@@ -208,7 +221,10 @@ export function RequestMatchesScreen({
   return (
     <section className="screen-stack">
       <section className="surface-card screen-stack">
-        <Link className={buttonClassName({ variant: "ghost" })} href="/profile/requests">
+        <Link
+          className={buttonClassName({ variant: "ghost" })}
+          href="/profile/requests"
+        >
           ←
         </Link>
         <div className="screen-copy">
@@ -275,11 +291,14 @@ export function RequestMatchesScreen({
                 candidateName: selectedInvite.candidateProfile.fullName,
                 requestTitle: collection.requestTitle,
                 requestType: scenarioShortLabels[collection.requestScenario],
-                role: selectedInvite.reasons.find((reason) =>
-                  reason.toLowerCase().includes("роль")
-                ) ?? null,
+                role:
+                  selectedInvite.reasons.find((reason) =>
+                    reason.toLowerCase().includes("роль")
+                  ) ?? null,
                 format: selectedInvite.candidateRequest?.preferredFormat
-                  ? formatLabelByValue[selectedInvite.candidateRequest.preferredFormat]
+                  ? formatLabelByValue[
+                      selectedInvite.candidateRequest.preferredFormat
+                    ]
                   : null
               }
             : null

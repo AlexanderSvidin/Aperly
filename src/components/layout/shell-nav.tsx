@@ -18,10 +18,15 @@ const navItems: {
   href: Route;
   label: string;
   Icon: IconComponent;
-  primary?: boolean;
+  activePrefixes?: string[];
 }[] = [
   { href: "/opportunities", label: "Возможности", Icon: NavIconOpportunities },
-  { href: "/create", label: "Создать", Icon: NavIconCreate, primary: true },
+  {
+    href: "/create",
+    label: "Создать",
+    Icon: NavIconCreate,
+    activePrefixes: ["/requests"]
+  },
   { href: "/connections", label: "Связи", Icon: NavIconConnections },
   { href: "/profile", label: "Профиль", Icon: NavIconProfile }
 ];
@@ -33,7 +38,11 @@ export function ShellNav() {
     <nav className="shell-nav" aria-label="Основная навигация">
       {navItems.map((item) => {
         const isActive =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+          pathname === item.href ||
+          pathname.startsWith(`${item.href}/`) ||
+          item.activePrefixes?.some(
+            (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+          ) === true;
         const Icon = item.Icon;
 
         return (
@@ -41,11 +50,10 @@ export function ShellNav() {
             key={item.href}
             className="shell-nav-link"
             data-active={isActive}
-            data-primary={item.primary === true}
             href={item.href}
           >
             <span className="shell-nav-icon" aria-hidden="true">
-              <Icon size={item.primary ? 28 : 24} />
+              <Icon size={26} />
             </span>
             <span className="shell-nav-label">{item.label}</span>
           </Link>

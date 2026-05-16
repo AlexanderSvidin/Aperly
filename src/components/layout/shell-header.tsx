@@ -12,11 +12,26 @@ const sectionTitles: { prefix: string; label: string }[] = [
 ];
 
 function getSectionLabel(pathname: string): string | null {
-  // Show section label only on top-level tab routes
   for (const { prefix, label } of sectionTitles) {
     if (pathname === prefix) {
       return label;
     }
+  }
+
+  if (pathname.startsWith("/connections/")) {
+    return "Связь";
+  }
+
+  if (pathname.startsWith("/opportunities/")) {
+    return "Возможность";
+  }
+
+  if (pathname.startsWith("/requests/")) {
+    return "Создать";
+  }
+
+  if (pathname.startsWith("/profile/")) {
+    return "Профиль";
   }
 
   return null;
