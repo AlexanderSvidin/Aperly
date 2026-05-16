@@ -4,6 +4,10 @@ import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 
+type DeleteProfileResponse = {
+  redirectTo?: string;
+};
+
 export function DeleteProfilePanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -18,14 +22,18 @@ export function DeleteProfilePanel() {
       });
 
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as
-          | { message?: string }
-          | null;
+        const payload = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
         setErrorMessage(payload?.message ?? "Не удалось удалить профиль.");
         return;
       }
 
-      window.location.href = "/";
+      const payload = (await response
+        .json()
+        .catch(() => null)) as DeleteProfileResponse | null;
+
+      window.location.assign(payload?.redirectTo ?? "/onboarding");
     });
   }
 
@@ -36,8 +44,8 @@ export function DeleteProfilePanel() {
         <h2 className="card-title">Удалить профиль</h2>
       </div>
       <p className="card-body-copy">
-        Профиль будет скрыт из поиска, активные запросы уйдут в архив, а сессия
-        завершится.
+        Профиль будет скрыт из поиска, активные запросы уйдут в архив, а вы
+        сможете заполнить анкету заново.
       </p>
 
       {isOpen ? (

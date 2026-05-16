@@ -105,7 +105,9 @@ export async function PUT(request: Request) {
     return NextResponse.json(
       {
         message:
-          error instanceof Error ? error.message : "Не удалось сохранить профиль."
+          error instanceof Error
+            ? error.message
+            : "Не удалось сохранить профиль."
       },
       {
         status: 400
@@ -130,15 +132,28 @@ export async function DELETE(request: Request) {
     );
   }
 
-  try {
-    await profileService.deleteProfile(user.id);
+  if (user.status === "BLOCKED" || user.status === "DELETED") {
+    const response = NextResponse.json(
+      {
+        message: "Профиль недоступен для удаления."
+      },
+      {
+        status: 403
+      }
+    );
 
-    const response = NextResponse.json({
-      deleted: true
-    });
     response.cookies.set(buildClearedAppSessionCookie());
 
     return response;
+  }
+
+  try {
+    await profileService.deleteProfile(user.id);
+
+    return NextResponse.json({
+      deleted: true,
+      redirectTo: "/onboarding"
+    });
   } catch (error) {
     return NextResponse.json(
       {

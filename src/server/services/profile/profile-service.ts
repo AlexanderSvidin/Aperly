@@ -18,7 +18,11 @@ function buildMatchingFingerprint(input: {
   skillIds: string[];
   subjectIds: string[];
   preferredFormats: string[];
-  availabilitySlots: { dayOfWeek: string; startMinute: number; endMinute: number }[];
+  availabilitySlots: {
+    dayOfWeek: string;
+    startMinute: number;
+    endMinute: number;
+  }[];
   isDiscoverable: boolean;
   discoverableScenarios: string[];
 }) {
@@ -138,7 +142,9 @@ export const profileService = {
       return null;
     }
 
-    const telegramIdentity = [user.firstName, user.lastName].filter(Boolean).join(" ");
+    const telegramIdentity = [user.firstName, user.lastName]
+      .filter(Boolean)
+      .join(" ");
     const normalizedProgramId =
       normalizeStoredProgramId(user.profile?.program) ??
       "ba-international-business-economics";
@@ -218,7 +224,7 @@ export const profileService = {
     }
 
     const normalizedProgram = input.program
-      ? normalizeStoredProgramId(input.program) ?? input.program
+      ? (normalizeStoredProgramId(input.program) ?? input.program)
       : input.direction;
 
     const result = await prisma.$transaction(async (transaction) => {
@@ -233,7 +239,9 @@ export const profileService = {
           campus: input.institution,
           program: normalizedProgram,
           courseYear: input.courseYear,
-          telegramUsername: currentUser.username ? `@${currentUser.username}` : null
+          telegramUsername: currentUser.username
+            ? `@${currentUser.username}`
+            : null
         },
         update: {
           fullName: input.fullName,
@@ -248,7 +256,9 @@ export const profileService = {
           id: userId
         },
         data: {
-          onboardingCompleted: true
+          status: "ACTIVE",
+          onboardingCompleted: true,
+          deletedAt: null
         },
         include: {
           profile: true
@@ -269,43 +279,43 @@ export const profileService = {
     const input = profileInputSchema.parse(rawInput);
 
     const currentUser = await prisma.user.findUnique({
-        where: {
-          id: userId
+      where: {
+        id: userId
+      },
+      include: {
+        profile: {
+          include: {
+            availabilitySlots: true
+          }
         },
-        include: {
-          profile: {
-            include: {
-              availabilitySlots: true
-            }
-          },
-          userSkills: {
-            select: {
-              skillId: true,
-              skill: {
-                select: {
-                  id: true
-                }
+        userSkills: {
+          select: {
+            skillId: true,
+            skill: {
+              select: {
+                id: true
               }
-            }
-          },
-          userSubjects: {
-            include: {
-              subject: {
-                select: {
-                  id: true,
-                  slug: true
-                }
-              }
-            }
-          },
-          languageSkills: {
-            select: {
-              language: true,
-              level: true
             }
           }
+        },
+        userSubjects: {
+          include: {
+            subject: {
+              select: {
+                id: true,
+                slug: true
+              }
+            }
+          }
+        },
+        languageSkills: {
+          select: {
+            language: true,
+            level: true
+          }
         }
-      });
+      }
+    });
 
     if (!currentUser) {
       throw new Error("Пользователь не найден.");
@@ -336,10 +346,13 @@ export const profileService = {
       : [];
 
     const result = await prisma.$transaction(async (transaction) => {
-      const resolvedSkillIds = await resolveSkillIdsWithCustomNames(transaction, {
-        skillIds: input.skillIds,
-        customSkillNames: input.customSkillNames
-      });
+      const resolvedSkillIds = await resolveSkillIdsWithCustomNames(
+        transaction,
+        {
+          skillIds: input.skillIds,
+          customSkillNames: input.customSkillNames
+        }
+      );
 
       const skillsCount = await transaction.skill.count({
         where: {
@@ -353,10 +366,13 @@ export const profileService = {
         throw new Error("Некоторые выбранные навыки не существуют.");
       }
 
-      const resolvedSubjectIds = await resolveSubjectIdsWithCustomNames(transaction, {
-        subjectIds: input.subjectIds,
-        customSubjectNames: input.customSubjectNames
-      });
+      const resolvedSubjectIds = await resolveSubjectIdsWithCustomNames(
+        transaction,
+        {
+          subjectIds: input.subjectIds,
+          customSubjectNames: input.customSubjectNames
+        }
+      );
 
       const subjectsCount = await transaction.subject.count({
         where: {
@@ -465,7 +481,9 @@ export const profileService = {
           id: userId
         },
         data: {
-          onboardingCompleted: true
+          status: "ACTIVE",
+          onboardingCompleted: true,
+          deletedAt: null
         },
         include: {
           profile: {
@@ -580,6 +598,33 @@ export const profileService = {
         }
       });
 
+      await Promise.all([
+        transaction.userSkill.deleteMany({
+          where: {
+            userId
+          }
+        }),
+        transaction.userSubject.deleteMany({
+          where: {
+            userId
+          }
+        }),
+        transaction.languageSkill.deleteMany({
+          where: {
+            userId
+          }
+        }),
+        transaction.availabilitySlot.deleteMany({
+          where: {
+            profile: {
+              is: {
+                userId
+              }
+            }
+          }
+        })
+      ]);
+
       await transaction.profile.updateMany({
         where: {
           userId
@@ -601,11 +646,8 @@ export const profileService = {
           id: userId
         },
         data: {
-          status: "DELETED",
+          status: "INACTIVE",
           onboardingCompleted: false,
-          username: null,
-          firstName: "Удалённый",
-          lastName: null,
           deletedAt: now
         }
       });

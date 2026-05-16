@@ -113,7 +113,10 @@ async function cleanupContext(context: TestContext) {
 
   await prisma.connection.deleteMany({
     where: {
-      OR: [{ userAId: { in: context.userIds } }, { userBId: { in: context.userIds } }]
+      OR: [
+        { userAId: { in: context.userIds } },
+        { userBId: { in: context.userIds } }
+      ]
     }
   });
 
@@ -438,9 +441,15 @@ test("legacy fallback chat invite flow is disabled", async () => {
 
   try {
     const owner = await createUser(context, { firstName: "InviteOwner" });
-    const recipient = await createUser(context, { firstName: "InviteRecipient" });
+    const recipient = await createUser(context, {
+      firstName: "InviteRecipient"
+    });
     const subject = await createSubject(context);
-    const sourceRequest = await createStudyRequest(context, owner.id, subject.id);
+    const sourceRequest = await createStudyRequest(
+      context,
+      owner.id,
+      subject.id
+    );
 
     const match = await prisma.match.create({
       data: {
@@ -465,7 +474,8 @@ test("legacy fallback chat invite flow is disabled", async () => {
     context.matchIds.push(match.id);
 
     await assert.rejects(
-      () => chatService.openFromMatch(owner.id, match.id, "Legacy intro message"),
+      () =>
+        chatService.openFromMatch(owner.id, match.id, "Legacy intro message"),
       { code: "legacy_chat_disabled", status: 410 }
     );
     const disabledStoredMatch = await prisma.match.findUniqueOrThrow({
@@ -492,8 +502,14 @@ test("legacy fallback chat invite flow is disabled", async () => {
       include: { chat: true }
     });
 
-    assert.deepEqual(firstResult, { status: "RESPONSE_SENT", matchId: match.id });
-    assert.deepEqual(secondResult, { status: "RESPONSE_SENT", matchId: match.id });
+    assert.deepEqual(firstResult, {
+      status: "RESPONSE_SENT",
+      matchId: match.id
+    });
+    assert.deepEqual(secondResult, {
+      status: "RESPONSE_SENT",
+      matchId: match.id
+    });
     assert.equal(storedMatch.status, "PENDING_RECIPIENT_ACCEPTANCE");
     assert.equal(storedMatch.chat, null);
   } finally {
@@ -506,10 +522,20 @@ test("legacy match response flow is disabled and does not create chat consent", 
 
   try {
     const sender = await createUser(context, { firstName: "IntroSender" });
-    const recipient = await createUser(context, { firstName: "IntroRecipient" });
+    const recipient = await createUser(context, {
+      firstName: "IntroRecipient"
+    });
     const subject = await createSubject(context);
-    const senderRequest = await createStudyRequest(context, sender.id, subject.id);
-    const recipientRequest = await createStudyRequest(context, recipient.id, subject.id);
+    const senderRequest = await createStudyRequest(
+      context,
+      sender.id,
+      subject.id
+    );
+    const recipientRequest = await createStudyRequest(
+      context,
+      recipient.id,
+      subject.id
+    );
 
     const match = await prisma.match.create({
       data: {
@@ -533,7 +559,8 @@ test("legacy match response flow is disabled and does not create chat consent", 
     });
     context.matchIds.push(match.id);
 
-    const intro = "Я уже разбирал этот предмет и предлагаю созвониться на неделе.";
+    const intro =
+      "Я уже разбирал этот предмет и предлагаю созвониться на неделе.";
     await assert.rejects(
       () => chatService.openFromMatch(sender.id, match.id, intro),
       { code: "legacy_chat_disabled", status: 410 }
@@ -547,7 +574,9 @@ test("legacy match response flow is disabled and does not create chat consent", 
     });
 
     assert.equal(
-      Boolean((storedMatch.reasonDetails as { response?: unknown } | null)?.response),
+      Boolean(
+        (storedMatch.reasonDetails as { response?: unknown } | null)?.response
+      ),
       false
     );
     assert.equal(disabledChatCount, 0);
@@ -558,7 +587,9 @@ test("legacy match response flow is disabled and does not create chat consent", 
       recipient.id,
       recipientRequest.id
     );
-    const receivedMatch = recipientMatches.matches.find((item) => item.id === match.id);
+    const receivedMatch = recipientMatches.matches.find(
+      (item) => item.id === match.id
+    );
 
     assert.deepEqual(sent, { status: "RESPONSE_SENT", matchId: match.id });
     assert.equal(receivedMatch?.response.status, "RECEIVED");
@@ -622,7 +653,9 @@ test("deleted profile is hidden from discovery and matching fallback", async () 
   const context = buildContext("delete_profile");
 
   try {
-    const deletedUser = await createUser(context, { firstName: "DeletedCandidate" });
+    const deletedUser = await createUser(context, {
+      firstName: "DeletedCandidate"
+    });
     const viewer = await createUser(context, { firstName: "DeleteViewer" });
     const subject = await createSubject(context);
     await createStudyRequest(context, deletedUser.id, subject.id);
@@ -642,9 +675,84 @@ test("deleted profile is hidden from discovery and matching fallback", async () 
   }
 });
 
+test("self-deleted profile returns to onboarding and can be recreated", async () => {
+  const context = buildContext("delete_profile_restart");
+
+  try {
+    const user = await createUser(context, { firstName: "RestartCandidate" });
+    const subject = await createSubject(context);
+
+    await prisma.userSubject.create({
+      data: {
+        userId: user.id,
+        subjectId: subject.id
+      }
+    });
+    await prisma.availabilitySlot.create({
+      data: {
+        profileId: user.profile!.id,
+        dayOfWeek: "MONDAY",
+        startMinute: 600,
+        endMinute: 660
+      }
+    });
+
+    await profileService.deleteProfile(user.id);
+
+    const deletedUser = await prisma.user.findUniqueOrThrow({
+      where: {
+        id: user.id
+      },
+      include: {
+        profile: true
+      }
+    });
+
+    assert.equal(deletedUser.status, "INACTIVE");
+    assert.equal(deletedUser.onboardingCompleted, false);
+    assert.ok(deletedUser.deletedAt);
+    assert.equal(deletedUser.profile?.isDiscoverable, false);
+    assert.equal(
+      await prisma.userSubject.count({
+        where: {
+          userId: user.id
+        }
+      }),
+      0
+    );
+    assert.equal(
+      await prisma.availabilitySlot.count({
+        where: {
+          profileId: user.profile!.id
+        }
+      }),
+      0
+    );
+
+    const restored = await profileService.upsertMinimalProfile(user.id, {
+      fullName: "Restart Candidate",
+      institution: "НИУ ВШЭ - Пермь",
+      programType: "BACHELOR",
+      direction: "Экономика",
+      program: null,
+      courseYear: 1
+    });
+
+    assert.equal(restored.user.status, "ACTIVE");
+    assert.equal(restored.user.onboardingCompleted, true);
+    assert.equal(restored.user.deletedAt, null);
+    assert.equal(restored.user.profile?.fullName, "Restart Candidate");
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
 test("request notes use private label copy", () => {
   const componentSource = readFileSync(
-    new URL("../src/features/requests/components/request-composer-shell.tsx", import.meta.url),
+    new URL(
+      "../src/features/requests/components/request-composer-shell.tsx",
+      import.meta.url
+    ),
     "utf8"
   );
 
@@ -769,10 +877,16 @@ test("homeService feed excludes current user and inactive requests", async () =>
   try {
     const viewer = await createUser(context, { firstName: "Viewer" });
     const partner = await createUser(context, { firstName: "Partner" });
-    const inactiveOwner = await createUser(context, { firstName: "InactiveOwner" });
+    const inactiveOwner = await createUser(context, {
+      firstName: "InactiveOwner"
+    });
     const subject = await createSubject(context);
     const ownRequest = await createStudyRequest(context, viewer.id, subject.id);
-    const partnerRequest = await createStudyRequest(context, partner.id, subject.id);
+    const partnerRequest = await createStudyRequest(
+      context,
+      partner.id,
+      subject.id
+    );
     const inactiveRequest = await createStudyRequest(
       context,
       inactiveOwner.id,
@@ -791,9 +905,12 @@ test("homeService feed excludes current user and inactive requests", async () =>
 
     assert.ok(feed.opportunities.some((item) => item.id === partnerRequest.id));
     assert.ok(!feed.opportunities.some((item) => item.id === ownRequest.id));
-    assert.ok(!feed.opportunities.some((item) => item.id === inactiveRequest.id));
+    assert.ok(
+      !feed.opportunities.some((item) => item.id === inactiveRequest.id)
+    );
     assert.equal(
-      studyFeed.opportunities.filter((item) => item.id === partnerRequest.id).length,
+      studyFeed.opportunities.filter((item) => item.id === partnerRequest.id)
+        .length,
       1
     );
     assert.equal(studyFeed.opportunities[0]?.scenario, "STUDY");
@@ -980,7 +1097,11 @@ test("requestService creates StudyBuddy request and recomputes R2R matches", asy
     const owner = await createUser(context, { firstName: "StudyOwner" });
     const partner = await createUser(context, { firstName: "StudyPartner" });
     const subject = await createSubject(context);
-    const partnerRequest = await createStudyRequest(context, partner.id, subject.id);
+    const partnerRequest = await createStudyRequest(
+      context,
+      partner.id,
+      subject.id
+    );
 
     const created = await requestService.create(
       {
@@ -1043,7 +1164,9 @@ test("requestService creates StudyBuddy request with a custom subject without du
 
   try {
     const owner = await createUser(context, { firstName: "CustomOwner" });
-    const secondOwner = await createUser(context, { firstName: "CustomOwnerTwo" });
+    const secondOwner = await createUser(context, {
+      firstName: "CustomOwnerTwo"
+    });
 
     const created = await requestService.create(
       {
@@ -1170,7 +1293,10 @@ test("requestService updates active request details and keeps existing chatted m
 
     assert.equal(updated.details.type, "PROJECT");
     if (updated.details.type === "PROJECT") {
-      assert.equal(updated.details.projectTitle, `${context.prefix} Updated Project`);
+      assert.equal(
+        updated.details.projectTitle,
+        `${context.prefix} Updated Project`
+      );
       assert.equal(updated.details.stage, "EARLY_TRACTION");
     }
     assert.equal(existingMatch?.chat?.id, chat.id);
@@ -1206,7 +1332,9 @@ test("requestService pauses, resumes, closes and archives requests", async () =>
 
     const visibleRequests = await requestService.listForUser(owner.id);
     assert.equal(
-      visibleRequests.some((visibleRequest) => visibleRequest.id === request.id),
+      visibleRequests.some(
+        (visibleRequest) => visibleRequest.id === request.id
+      ),
       true
     );
   } finally {
@@ -1254,8 +1382,14 @@ test("response lifecycle prevents duplicates and reveals Telegram only on active
   const context = buildContext("response_lifecycle");
 
   try {
-    const owner = await createUser(context, { firstName: "ResponseOwner", username: "owner_contact" });
-    const responder = await createUser(context, { firstName: "ResponseSender", username: "sender_contact" });
+    const owner = await createUser(context, {
+      firstName: "ResponseOwner",
+      username: "owner_contact"
+    });
+    const responder = await createUser(context, {
+      firstName: "ResponseSender",
+      username: "sender_contact"
+    });
     const subject = await createSubject(context);
     const request = await createStudyRequest(context, owner.id, subject.id);
 
@@ -1270,20 +1404,33 @@ test("response lifecycle prevents duplicates and reveals Telegram only on active
       "Повторный отклик не должен создать дубль."
     );
     const interactionCount = await prisma.interaction.count({
-      where: { type: "RESPONSE", senderUserId: responder.id, targetRequestId: request.id }
+      where: {
+        type: "RESPONSE",
+        senderUserId: responder.id,
+        targetRequestId: request.id
+      }
     });
 
     assert.equal(first.status, "PENDING");
     assert.equal(duplicate.id, first.id);
     assert.equal(interactionCount, 1);
 
-    const accepted = await connectionService.respondToInteraction(owner.id, first.id, "ACCEPT");
+    const accepted = await connectionService.respondToInteraction(
+      owner.id,
+      first.id,
+      "ACCEPT"
+    );
     assert.ok(accepted.connection?.id);
 
     if (accepted.connection?.id) {
       const list = await connectionService.listForUser(owner.id);
-      const summary = list.active.find((connection) => connection.id === accepted.connection?.id);
-      const detail = await connectionService.getConnectionForUser(owner.id, accepted.connection.id);
+      const summary = list.active.find(
+        (connection) => connection.id === accepted.connection?.id
+      );
+      const detail = await connectionService.getConnectionForUser(
+        owner.id,
+        accepted.connection.id
+      );
 
       assert.equal(summary?.telegramUsername, null);
       assert.equal(detail.status, "ACTIVE");
@@ -1293,7 +1440,10 @@ test("response lifecycle prevents duplicates and reveals Telegram only on active
         where: { id: request.id },
         data: { status: "CLOSED", closedAt: new Date() }
       });
-      const stillActive = await connectionService.getConnectionForUser(owner.id, accepted.connection.id);
+      const stillActive = await connectionService.getConnectionForUser(
+        owner.id,
+        accepted.connection.id
+      );
       assert.equal(stillActive.status, "ACTIVE");
     }
   } finally {
@@ -1306,17 +1456,31 @@ test("declined response and invitation do not create connections", async () => {
 
   try {
     const owner = await createUser(context, { firstName: "DeclineOwner" });
-    const candidate = await createUser(context, { firstName: "DeclineCandidate" });
+    const candidate = await createUser(context, {
+      firstName: "DeclineCandidate"
+    });
     const subject = await createSubject(context);
-    const ownerRequest = await createStudyRequest(context, owner.id, subject.id);
-    const candidateRequest = await createStudyRequest(context, candidate.id, subject.id);
+    const ownerRequest = await createStudyRequest(
+      context,
+      owner.id,
+      subject.id
+    );
+    const candidateRequest = await createStudyRequest(
+      context,
+      candidate.id,
+      subject.id
+    );
 
     const response = await connectionService.createResponseForRequest(
       candidate.id,
       ownerRequest.id,
       "Могу помочь с этим учебным запросом."
     );
-    await connectionService.respondToInteraction(owner.id, response.id, "DECLINE");
+    await connectionService.respondToInteraction(
+      owner.id,
+      response.id,
+      "DECLINE"
+    );
 
     const match = await prisma.match.create({
       data: {
@@ -1344,14 +1508,15 @@ test("declined response and invitation do not create connections", async () => {
       match.id,
       "Повторное приглашение не должно создать дубль."
     );
-    await connectionService.respondToInteraction(candidate.id, invitation.id, "DECLINE");
+    await connectionService.respondToInteraction(
+      candidate.id,
+      invitation.id,
+      "DECLINE"
+    );
 
     const connectionCount = await prisma.connection.count({
       where: {
-        OR: [
-          { interactionId: response.id },
-          { interactionId: invitation.id }
-        ]
+        OR: [{ interactionId: response.id }, { interactionId: invitation.id }]
       }
     });
 
@@ -1366,13 +1531,23 @@ test("archiveService returns ended connections, closed requests and declined int
   const context = buildContext("archive_contract");
 
   try {
-    const owner = await createUser(context, { firstName: "ArchiveContractOwner" });
+    const owner = await createUser(context, {
+      firstName: "ArchiveContractOwner"
+    });
     const candidate = await createUser(context, {
       firstName: "ArchiveContractCandidate"
     });
     const subject = await createSubject(context);
-    const ownerRequest = await createStudyRequest(context, owner.id, subject.id);
-    const candidateRequest = await createStudyRequest(context, candidate.id, subject.id);
+    const ownerRequest = await createStudyRequest(
+      context,
+      owner.id,
+      subject.id
+    );
+    const candidateRequest = await createStudyRequest(
+      context,
+      candidate.id,
+      subject.id
+    );
     const actor = {
       id: owner.id,
       status: "ACTIVE" as const,
@@ -1384,7 +1559,11 @@ test("archiveService returns ended connections, closed requests and declined int
       ownerRequest.id,
       "Готов обсудить этот учебный запрос."
     );
-    await connectionService.respondToInteraction(owner.id, declined.id, "DECLINE");
+    await connectionService.respondToInteraction(
+      owner.id,
+      declined.id,
+      "DECLINE"
+    );
 
     const accepted = await connectionService.createResponseForRequest(
       owner.id,
@@ -1400,7 +1579,10 @@ test("archiveService returns ended connections, closed requests and declined int
     assert.ok(acceptedResult.connection?.id);
 
     if (acceptedResult.connection?.id) {
-      await connectionService.endConnection(owner.id, acceptedResult.connection.id);
+      await connectionService.endConnection(
+        owner.id,
+        acceptedResult.connection.id
+      );
     }
 
     await requestService.close(actor, ownerRequest.id);
@@ -1412,8 +1594,12 @@ test("archiveService returns ended connections, closed requests and declined int
         (connection) => connection.id === acceptedResult.connection?.id
       )
     );
-    assert.ok(archive.requests.some((request) => request.id === ownerRequest.id));
-    assert.ok(archive.declined.some((interaction) => interaction.id === declined.id));
+    assert.ok(
+      archive.requests.some((request) => request.id === ownerRequest.id)
+    );
+    assert.ok(
+      archive.declined.some((interaction) => interaction.id === declined.id)
+    );
   } finally {
     await cleanupContext(context);
   }
@@ -1464,7 +1650,9 @@ test("activity request can be created and appears in opportunities", async () =>
 
     const activity = await createActivityRequest(context, owner.id);
     await matchingService.recomputeForRequest(activity.id);
-    const feed = await homeService.getFeedForUser(viewer.id, { scenario: "ACTIVITY" });
+    const feed = await homeService.getFeedForUser(viewer.id, {
+      scenario: "ACTIVITY"
+    });
 
     assert.ok(feed.opportunities.some((item) => item.id === activity.id));
     assert.equal(feed.selectedScenario, "ACTIVITY");
@@ -1580,8 +1768,16 @@ test("studySessionService supports first session, completion and repeat scheduli
     const owner = await createUser(context, { firstName: "SessionOwner" });
     const partner = await createUser(context, { firstName: "SessionPartner" });
     const subject = await createSubject(context);
-    const ownerRequest = await createStudyRequest(context, owner.id, subject.id);
-    const partnerRequest = await createStudyRequest(context, partner.id, subject.id);
+    const ownerRequest = await createStudyRequest(
+      context,
+      owner.id,
+      subject.id
+    );
+    const partnerRequest = await createStudyRequest(
+      context,
+      partner.id,
+      subject.id
+    );
 
     const match = await prisma.match.create({
       data: {
@@ -1611,11 +1807,15 @@ test("studySessionService supports first session, completion and repeat scheduli
     });
     context.chatIds.push(chat.id);
 
-    const firstSession = await studySessionService.scheduleFirst(owner.id, match.id, {
-      scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      format: "ONLINE",
-      notes: `${context.prefix} first session`
-    });
+    const firstSession = await studySessionService.scheduleFirst(
+      owner.id,
+      match.id,
+      {
+        scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        format: "ONLINE",
+        notes: `${context.prefix} first session`
+      }
+    );
     context.sessionIds.push(firstSession.id);
 
     const confirmed = await studySessionService.updateSession(
@@ -1632,7 +1832,9 @@ test("studySessionService supports first session, completion and repeat scheduli
       owner.id,
       firstSession.id,
       {
-        scheduledAt: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+        scheduledAt: new Date(
+          Date.now() + 8 * 24 * 60 * 60 * 1000
+        ).toISOString(),
         format: "ONLINE",
         notes: `${context.prefix} repeat session`
       }

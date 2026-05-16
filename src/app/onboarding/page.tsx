@@ -15,11 +15,14 @@ export default async function OnboardingPage() {
   const telegramIdentity = [user.firstName, user.lastName]
     .filter(Boolean)
     .join(" ");
+  const defaultFullName = user.deletedAt
+    ? telegramIdentity
+    : (user.profile?.fullName ?? telegramIdentity);
 
   return (
     <main className="welcome-layout">
       <MinimalOnboardingForm
-        defaultFullName={user.profile?.fullName ?? telegramIdentity}
+        defaultFullName={defaultFullName}
         defaultInstitution={user.profile?.campus ?? undefined}
       />
     </main>
