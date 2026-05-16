@@ -40,7 +40,18 @@
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_p31mOQtJGnoR@ep-lingering-waterfall-aniwbv2q-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx prisma migrate resolve --applied \"20260423_allow_duplicate_subject_names\")",
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_p31mOQtJGnoR@ep-lingering-waterfall-aniwbv2q-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx prisma migrate deploy)",
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_p31mOQtJGnoR@ep-lingering-waterfall-aniwbv2q.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx prisma migrate deploy)",
-      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_p31mOQtJGnoR@ep-lingering-waterfall-aniwbv2q-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx prisma migrate resolve --applied \"20260427_language_skills_subject_cleanup\")"
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_p31mOQtJGnoR@ep-lingering-waterfall-aniwbv2q-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx prisma migrate resolve --applied \"20260427_language_skills_subject_cleanup\")",
+      "Bash(pandoc \"C:\\\\Users\\\\Василий\\\\Downloads\\\\AperlyNew\\\\Aperly_доработанная_логика_для_TЗ_Codex.docx\" -o \"C:\\\\Users\\\\Василий\\\\Downloads\\\\AperlyNew\\\\aperly_spec.md\")",
+      "Bash(where pandoc *)",
+      "Bash(python3 -c \"import docx; print\\('python-docx available'\\)\")",
+      "Bash(python -c \"import docx; print\\('python-docx available'\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(xargs grep -l \"BottomNav\\\\|bottom-nav\\\\|bottomNav\")",
+      "Bash(xargs grep -l \"MobileAppShell\\\\|BottomNav\\\\|bottom-nav\")",
+      "Bash(xargs grep -L \"legacyChatDisabledResponse\")",
+      "Bash(npm test *)",
+      "Bash(ls .env*)",
+      "Bash(ls *.env)"
     ]
   }
 }

@@ -71,21 +71,20 @@ export default function LoadingPage() {
 
   return (
     <main className="welcome-layout">
-      <section className="surface-card screen-stack">
+      <section className="surface-card screen-stack loading-screen-card">
+        <div className="loading-brand">
+          <p className="loading-brand-name">Aperly</p>
+        </div>
         <div className="screen-copy">
-          <p className="card-eyebrow">Aperly</p>
           <h1 className="screen-title">Ищем ваш профиль в Telegram</h1>
-          <p className="screen-description">
-            Проверяем сессию и обновляем данные, чтобы не показать профиль другого аккаунта.
-          </p>
         </div>
         {error ? (
           <div className="feedback-box error-box">
             <p className="feedback-title">{error}</p>
           </div>
         ) : (
-          <div className="feedback-box">
-            <p className="feedback-title">Загрузка...</p>
+          <div className="loading-spinner" aria-label="Загрузка" role="status">
+            <span className="loading-spinner-ring" aria-hidden="true" />
           </div>
         )}
         {error ? (

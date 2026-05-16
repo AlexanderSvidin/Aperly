@@ -2,10 +2,11 @@
 
 import { useMemo, useRef, useState } from "react";
 
+import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonClassName } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { minuteToTimeValue } from "@/features/profile/lib/profile-options";
 import {
@@ -54,6 +55,8 @@ type RequestComposerShellProps = {
     courseYear: number;
   };
   initialScenario?: RequestScenario;
+  /** When set, hides the scenario picker and locks the form to one scenario. */
+  singleScenario?: RequestScenario;
 };
 
 type AvailabilityDraft = {
@@ -369,7 +372,8 @@ export function RequestComposerShell({
   initialRequests,
   subjects,
   studyDefaults,
-  initialScenario
+  initialScenario,
+  singleScenario
 }: RequestComposerShellProps) {
   const router = useRouter();
   const [requests, setRequests] = useState(initialRequests);
@@ -402,21 +406,23 @@ export function RequestComposerShell({
     return latestEntries;
   }, [requests]);
 
+  const effectiveInitialScenario = singleScenario ?? initialScenario ?? null;
+
   const [selectedScenario, setSelectedScenario] =
-    useState<RequestScenario | null>(initialScenario ?? null);
+    useState<RequestScenario | null>(effectiveInitialScenario);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(
-    initialScenario ? activeRequestsByScenario.get(initialScenario)?.id ?? null : null
+    effectiveInitialScenario ? activeRequestsByScenario.get(effectiveInitialScenario)?.id ?? null : null
   );
   const [draft, setDraft] = useState<RequestDraft | null>(() => {
-    if (!initialScenario) {
+    if (!effectiveInitialScenario) {
       return null;
     }
 
-    const activeRequest = activeRequestsByScenario.get(initialScenario);
+    const activeRequest = activeRequestsByScenario.get(effectiveInitialScenario);
 
     return activeRequest
       ? createDraftFromRequest(activeRequest)
-      : createDefaultDraft(initialScenario, subjects);
+      : createDefaultDraft(effectiveInitialScenario, subjects);
   });
   const [studyLevel, setStudyLevel] = useState<StudyLevelId>(
     studyDefaults.studyLevel
@@ -940,16 +946,35 @@ export function RequestComposerShell({
     ? activeRequestsByScenario.get(selectedScenario)
     : undefined;
 
+  const scenarioLabel = singleScenario
+    ? (requestScenarioOptions.find((o) => o.value === singleScenario)?.label ?? singleScenario)
+    : null;
+
   return (
     <section className="screen-stack">
-      <div className="screen-copy">
-        <h1 className="screen-title">Создать запрос</h1>
-        <p className="screen-description">
-          Выберите сценарий и опишите, кого ищете. После публикации люди
-          смогут откликнуться, а подходящие появятся в разделе «Отклики».
-        </p>
-      </div>
+      <section className="surface-card screen-stack">
+        {singleScenario ? (
+          <Link className={buttonClassName({ variant: "ghost" })} href="/create">
+            ←
+          </Link>
+        ) : null}
+        <div className="screen-copy">
+          {singleScenario ? (
+            <p className="card-eyebrow">Aperly | {scenarioLabel}</p>
+          ) : null}
+          <h1 className="screen-title">
+            {singleScenario ? scenarioLabel : "Создать запрос"}
+          </h1>
+          {!singleScenario ? (
+            <p className="screen-description">
+              Выберите сценарий и опишите, кого ищете. После публикации люди
+              смогут откликнуться, а подходящие появятся в разделе «Отклики».
+            </p>
+          ) : null}
+        </div>
+      </section>
 
+      {!singleScenario ? (
       <div className="screen-grid">
         {requestScenarioOptions.map((scenario) => {
           const request = latestRequestsByScenario.get(scenario.value);
@@ -1067,6 +1092,7 @@ export function RequestComposerShell({
           );
         })}
       </div>
+      ) : null}
 
       <Card ref={formCardRef} eyebrow="Форма" title="Данные для запроса">
         <form
@@ -1074,23 +1100,6 @@ export function RequestComposerShell({
           className="profile-form"
           onSubmit={handleSubmit}
         >
-          <div className="field-stack">
-            <span className="field-label">Что вы ищете</span>
-            <div className="toggle-grid">
-              {requestScenarioOptions.map((scenario) => (
-                <button
-                  key={scenario.value}
-                  className="toggle-chip"
-                  data-selected={selectedScenario === scenario.value}
-                  onClick={() => selectScenario(scenario.value)}
-                  type="button"
-                >
-                  {scenario.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {feedback ? (
             <div
               className={

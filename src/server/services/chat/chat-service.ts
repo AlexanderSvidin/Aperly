@@ -1,3 +1,9 @@
+/**
+ * @deprecated Deprecated legacy in-app chat service.
+ * Disabled for Product Logic v2.0 — no in-app messenger.
+ * All /api/chats/** endpoints return 410 Gone.
+ * Active connections use Connection → Telegram handoff instead.
+ */
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db/client";
