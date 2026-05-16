@@ -2091,3 +2091,139 @@ a {
 .scenario-chooser-card:hover {
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.12);
 }
+
+.telegram-contact-card {
+  gap: 18px;
+}
+
+.telegram-contact-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.telegram-username {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--tg-text-color);
+}
+
+.telegram-username-empty {
+  color: var(--tg-hint-color);
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.telegram-status {
+  margin: 0;
+  font-size: 14px;
+  color: var(--tg-hint-color);
+}
+
+.telegram-status-connected {
+  color: #5f37ff;
+  font-weight: 500;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.switch-row-label {
+  font-size: 15px;
+  color: var(--tg-text-color);
+  line-height: 1.4;
+}
+
+.switch-control {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.switch-control input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.switch-control input:disabled {
+  cursor: not-allowed;
+}
+
+.switch-track {
+  display: inline-flex;
+  align-items: center;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(27, 31, 67, 0.18);
+  transition: background 0.15s ease;
+  padding: 2px;
+}
+
+.switch-thumb {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease;
+}
+
+.switch-control input:checked + .switch-track {
+  background: #5f37ff;
+}
+
+.switch-control input:checked + .switch-track .switch-thumb {
+  transform: translateX(18px);
+}
+
+.switch-control input:disabled + .switch-track {
+  opacity: 0.5;
+}
+
+.telegram-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid rgba(27, 31, 67, 0.08);
+  border-bottom: 1px solid rgba(27, 31, 67, 0.08);
+}
+
+.telegram-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  background: transparent;
+  border: none;
+  font: inherit;
+  color: var(--tg-text-color);
+  cursor: pointer;
+  text-align: left;
+}
+
+.telegram-action-row + .telegram-action-row {
+  border-top: 1px solid rgba(27, 31, 67, 0.08);
+}
+
+.telegram-action-row:disabled {
+  color: var(--tg-hint-color);
+  cursor: not-allowed;
+}
+
+.telegram-action-row span[aria-hidden="true"] {
+  color: var(--tg-hint-color);
+}

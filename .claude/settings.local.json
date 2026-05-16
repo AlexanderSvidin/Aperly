@@ -51,7 +51,12 @@
       "Bash(xargs grep -L \"legacyChatDisabledResponse\")",
       "Bash(npm test *)",
       "Bash(ls .env*)",
-      "Bash(ls *.env)"
+      "Bash(ls *.env)",
+      "Bash(python -c \"import zipfile, re; z = zipfile.ZipFile\\(r'C:\\\\Users\\\\Василий\\\\Downloads\\\\Aperly_итоговый_отчёт_для_Codex.docx'\\); t = z.read\\('word/document.xml'\\).decode\\('utf-8'\\); text = re.sub\\(r'<[^>]+>', ' ', t\\); print\\(text[:5000]\\)\")",
+      "Bash(python -c \"import zipfile, re, sys, io; sys.stdout = io.TextIOWrapper\\(sys.stdout.buffer, encoding='utf-8'\\); z = zipfile.ZipFile\\(r'C:\\\\Users\\\\Василий\\\\Downloads\\\\Aperly_итоговый_отчёт_для_Codex.docx'\\); t = z.read\\('word/document.xml'\\).decode\\('utf-8'\\); text = re.sub\\(r'<[^>]+>', ' ', t\\); text = re.sub\\(r'\\\\s+', ' ', text\\); idx = text.lower\\(\\).find\\('telegram'\\); print\\(text[max\\(0,idx-200\\):idx+3000]\\)\")",
+      "Bash(python -c \"import zipfile, re, sys, io; sys.stdout = io.TextIOWrapper\\(sys.stdout.buffer, encoding='utf-8'\\); z = zipfile.ZipFile\\(r'C:\\\\Users\\\\Василий\\\\Downloads\\\\Aperly_итоговый_отчёт_для_Codex.docx'\\); t = z.read\\('word/document.xml'\\).decode\\('utf-8'\\); text = re.sub\\(r'<[^>]+>', ' ', t\\); text = re.sub\\(r'\\\\s+', ' ', text\\); idx = text.find\\('Telegram-контакт'\\); print\\(text[max\\(0,idx-200\\):idx+3000] if idx>=0 else 'NF'\\)\")",
+      "Bash(python -c \"import zipfile, re, sys, io; sys.stdout = io.TextIOWrapper\\(sys.stdout.buffer, encoding='utf-8'\\); z = zipfile.ZipFile\\(r'C:\\\\Users\\\\Василий\\\\Downloads\\\\Aperly_итоговый_отчёт_для_Codex.docx'\\); t = z.read\\('word/document.xml'\\).decode\\('utf-8'\\); text = re.sub\\(r'<[^>]+>', ' ', t\\); text = re.sub\\(r'\\\\s+', ' ', text\\); positions = [m.start\\(\\) for m in re.finditer\\('Telegram', text\\)]; idx = positions[5] if len\\(positions\\)>5 else positions[-1]; print\\(text[idx:idx+3500]\\)\")",
+      "Bash(python -c \"import zipfile, re, sys, io; sys.stdout = io.TextIOWrapper\\(sys.stdout.buffer, encoding='utf-8'\\); z = zipfile.ZipFile\\(r'C:\\\\Users\\\\Василий\\\\Downloads\\\\Aperly_итоговый_отчёт_для_Codex.docx'\\); t = z.read\\('word/document.xml'\\).decode\\('utf-8'\\); text = re.sub\\(r'<[^>]+>', ' ', t\\); text = re.sub\\(r'\\\\s+', ' ', text\\); idx = text.find\\('12 Telegram-контакт'\\); print\\(text[max\\(0,idx-200\\):idx+3500] if idx>=0 else 'NF'\\); print\\('---'\\); idx2 = text.find\\('Telegram-контакт.png'\\); print\\(text[max\\(0,idx2-200\\):idx2+3500] if idx2>=0 else 'NF2'\\)\")"
     ]
   }
 }
