@@ -1,5 +1,6 @@
-import { ProfileScreenShell } from "@/features/profile/components/profile-screen-shell";
 import { notFound } from "next/navigation";
+
+import { BasicProfileForm } from "@/features/profile/components/basic-profile-form";
 import { requirePageUser } from "@/server/services/auth/current-user";
 import { profileService } from "@/server/services/profile/profile-service";
 
@@ -12,12 +13,13 @@ export default async function ProfileEditBasicPage() {
   }
 
   return (
-    <ProfileScreenShell
-      initialValues={data.initialValues}
-      key={user.id}
-      lookups={data.lookups}
-      mode="edit"
-      viewer={data.viewer}
+    <BasicProfileForm
+      defaultFullName={data.initialValues.fullName}
+      defaultInstitution={data.initialValues.campus}
+      defaultProgramType={data.initialValues.studyLevel}
+      defaultDirection={data.initialValues.programId}
+      defaultProgramId={data.initialValues.programId}
+      defaultCourseYear={data.initialValues.courseYear}
     />
   );
 }

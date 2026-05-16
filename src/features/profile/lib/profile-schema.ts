@@ -48,6 +48,7 @@ export type ProfileLanguageSkill = {
 export type ProfileDraft = {
   fullName: string;
   bio: string;
+  campus: string;
   studyLevel: StudyLevelId;
   programId: string;
   courseYear: number;
@@ -57,6 +58,7 @@ export type ProfileDraft = {
   customSubjectNames: string[];
   languageSkills: ProfileLanguageSkill[];
   preferredFormats: (typeof formatValues)[number][];
+  preferredRoles: string[];
   availabilitySlots: ProfileAvailabilitySlot[];
   isDiscoverable: boolean;
   discoverableScenarios: (typeof scenarioValues)[number][];
@@ -243,3 +245,145 @@ function normalizeSubjectName(value: string) {
 function normalizeSkillName(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
+
+const collaborationRoleValues = [
+  "ANALYST",
+  "DEVELOPER",
+  "DESIGNER",
+  "PRODUCT_MANAGER",
+  "RESEARCHER",
+  "MARKETER",
+  "FINANCE",
+  "PRESENTER",
+  "OTHER"
+] as const;
+
+export const basicProfileInputSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(160),
+    institution: z.string().trim().min(2).max(160),
+    programType: z.enum(studyLevelValues),
+    direction: z.string().trim().min(2).max(160),
+    program: z
+      .string()
+      .trim()
+      .max(160)
+      .optional()
+      .nullable()
+      .transform((value) => value || null),
+    courseYear: z.number().int().min(1).max(6)
+  })
+  .superRefine((value, context) => {
+    if (value.programType === "MASTER" && value.courseYear > 2) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["courseYear"],
+        message: "Для магистратуры доступны 1 и 2 курс."
+      });
+    }
+  })
+  .transform((value) => ({
+    ...value,
+    fullName: value.fullName.trim(),
+    institution: value.institution.trim(),
+    direction: value.direction.trim(),
+    program: value.program?.trim() || null
+  }));
+
+export type BasicProfileInput = z.infer<typeof basicProfileInputSchema>;
+
+export const skillsProfileInputSchema = z
+  .object({
+    skillIds: z.array(z.string().uuid()).max(MAX_PROFILE_SKILLS),
+    customSkillNames: z
+      .array(z.string().trim().min(2).max(120))
+      .max(MAX_PROFILE_SKILLS),
+    subjectIds: z.array(z.string().uuid()).max(MAX_PROFILE_SUBJECTS),
+    customSubjectNames: z
+      .array(z.string().trim().min(2).max(120))
+      .max(MAX_PROFILE_SUBJECTS),
+    languageSkills: z
+      .array(
+        z.object({
+          language: z.enum(languageValues),
+          level: z.enum(languageLevelValues)
+        })
+      )
+      .max(MAX_PROFILE_LANGUAGES)
+  })
+  .superRefine((value, context) => {
+    const totalSkills =
+      new Set(value.skillIds).size +
+      new Set(value.customSkillNames.map((name) => name.toLowerCase())).size;
+    const totalSubjects =
+      new Set(value.subjectIds).size +
+      new Set(value.customSubjectNames.map((name) => name.toLowerCase())).size;
+
+    if (totalSkills > MAX_PROFILE_SKILLS) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["skillIds"],
+        message: `Можно выбрать не больше ${MAX_PROFILE_SKILLS} навыков.`
+      });
+    }
+
+    if (totalSubjects > MAX_PROFILE_SUBJECTS) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["subjectIds"],
+        message: `Можно выбрать не больше ${MAX_PROFILE_SUBJECTS} предметов.`
+      });
+    }
+
+    if (
+      new Set(value.languageSkills.map((skill) => skill.language)).size !==
+      value.languageSkills.length
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["languageSkills"],
+        message: "Каждый язык можно указать только один раз."
+      });
+    }
+  })
+  .transform((value) => ({
+    skillIds: [...new Set(value.skillIds)],
+    customSkillNames: [
+      ...new Set(value.customSkillNames.map(normalizeSkillName))
+    ].filter(Boolean),
+    subjectIds: [...new Set(value.subjectIds)],
+    customSubjectNames: [
+      ...new Set(value.customSubjectNames.map(normalizeSubjectName))
+    ].filter(Boolean),
+    languageSkills: [...value.languageSkills]
+  }));
+
+export type SkillsProfileInput = z.infer<typeof skillsProfileInputSchema>;
+
+export const rolesProfileInputSchema = z
+  .object({
+    primaryRole: z.enum(collaborationRoleValues).nullable(),
+    additionalRoles: z.array(z.enum(collaborationRoleValues))
+  })
+  .transform((value) => {
+    const seen = new Set<string>();
+    const merged: (typeof collaborationRoleValues)[number][] = [];
+
+    if (value.primaryRole) {
+      seen.add(value.primaryRole);
+      merged.push(value.primaryRole);
+    }
+
+    for (const role of value.additionalRoles) {
+      if (!seen.has(role)) {
+        seen.add(role);
+        merged.push(role);
+      }
+    }
+
+    return {
+      preferredRoles: merged
+    };
+  });
+
+export type RolesProfileInput = z.infer<typeof rolesProfileInputSchema>;

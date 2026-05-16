@@ -1,9 +1,17 @@
-import { ProfileScreenShell } from "@/features/profile/components/profile-screen-shell";
 import { notFound } from "next/navigation";
+
+import { RolesProfileForm } from "@/features/profile/components/roles-profile-form";
+import { collaborationRoleOptions } from "@/features/requests/lib/request-options";
 import { requirePageUser } from "@/server/services/auth/current-user";
 import { profileService } from "@/server/services/profile/profile-service";
 
-export default async function ProfileEditBasicPage() {
+type RoleValue = (typeof collaborationRoleOptions)[number]["value"];
+
+const ALLOWED_ROLES = new Set<RoleValue>(
+  collaborationRoleOptions.map((option) => option.value)
+);
+
+export default async function ProfileEditRolesPage() {
   const user = await requirePageUser();
   const data = await profileService.getEditorData(user.id);
 
@@ -11,13 +19,9 @@ export default async function ProfileEditBasicPage() {
     notFound();
   }
 
-  return (
-    <ProfileScreenShell
-      initialValues={data.initialValues}
-      key={user.id}
-      lookups={data.lookups}
-      mode="edit"
-      viewer={data.viewer}
-    />
+  const initialRoles = data.initialValues.preferredRoles.filter(
+    (role): role is RoleValue => ALLOWED_ROLES.has(role as RoleValue)
   );
+
+  return <RolesProfileForm initialRoles={initialRoles} />;
 }
