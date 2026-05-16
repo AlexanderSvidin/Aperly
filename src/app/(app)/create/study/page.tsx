@@ -10,6 +10,7 @@ export default async function CreateStudyPage() {
     <RequestComposerShell
       initialRequests={composerData.requests}
       key={user.id}
+      mode="create"
       singleScenario="STUDY"
       studyDefaults={composerData.studyDefaults}
       subjects={composerData.subjects}

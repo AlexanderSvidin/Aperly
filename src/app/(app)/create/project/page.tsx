@@ -10,6 +10,7 @@ export default async function CreateProjectPage() {
     <RequestComposerShell
       initialRequests={composerData.requests}
       key={user.id}
+      mode="create"
       singleScenario="PROJECT"
       studyDefaults={composerData.studyDefaults}
       subjects={composerData.subjects}
