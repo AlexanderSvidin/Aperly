@@ -1,7 +1,10 @@
 import { prisma } from "@/server/db/client";
 import {
+  basicProfileInputSchema,
   onboardingProfileInputSchema,
   profileInputSchema,
+  rolesProfileInputSchema,
+  skillsProfileInputSchema,
   type ProfileDraft
 } from "@/features/profile/lib/profile-schema";
 import {
@@ -155,6 +158,7 @@ export const profileService = {
       initialValues: {
         fullName: user.profile?.fullName ?? telegramIdentity,
         bio: user.profile?.bio ?? "",
+        campus: user.profile?.campus ?? "",
         studyLevel: getLevelForProgramId(normalizedProgramId),
         programId: normalizedProgramId,
         courseYear: user.profile?.courseYear ?? 1,
@@ -175,6 +179,7 @@ export const profileService = {
           level: languageSkill.level
         })),
         preferredFormats: user.profile?.preferredFormats ?? [],
+        preferredRoles: user.profile?.preferredRoles ?? [],
         availabilitySlots:
           user.profile?.availabilitySlots.map((slot) => ({
             dayOfWeek: slot.dayOfWeek,
@@ -533,6 +538,147 @@ export const profileService = {
       matchingRelevantFieldsChanged: beforeFingerprint !== afterFingerprint,
       user: result.user
     };
+  },
+
+  async updateBasicSection(userId: string, rawInput: unknown) {
+    const input = basicProfileInputSchema.parse(rawInput);
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, status: true, profile: { select: { id: true } } }
+    });
+
+    if (!currentUser) {
+      throw new Error("Пользователь не найден.");
+    }
+
+    if (currentUser.status === "BLOCKED" || currentUser.status === "DELETED") {
+      throw new Error("Профиль недоступен для редактирования.");
+    }
+
+    const normalizedProgram = input.program
+      ? (normalizeStoredProgramId(input.program) ?? input.program)
+      : input.direction;
+
+    await prisma.profile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        fullName: input.fullName,
+        campus: input.institution,
+        program: normalizedProgram,
+        courseYear: input.courseYear
+      },
+      update: {
+        fullName: input.fullName,
+        campus: input.institution,
+        program: normalizedProgram,
+        courseYear: input.courseYear
+      }
+    });
+
+    return { ok: true as const };
+  },
+
+  async updateSkillsSection(userId: string, rawInput: unknown) {
+    const input = skillsProfileInputSchema.parse(rawInput);
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, status: true, profile: { select: { id: true } } }
+    });
+
+    if (!currentUser) {
+      throw new Error("Пользователь не найден.");
+    }
+
+    if (currentUser.status === "BLOCKED" || currentUser.status === "DELETED") {
+      throw new Error("Профиль недоступен для редактирования.");
+    }
+
+    if (!currentUser.profile) {
+      throw new Error(
+        "Сначала заполните основные данные профиля."
+      );
+    }
+
+    await prisma.$transaction(async (transaction) => {
+      const resolvedSkillIds = await resolveSkillIdsWithCustomNames(
+        transaction,
+        {
+          skillIds: input.skillIds,
+          customSkillNames: input.customSkillNames
+        }
+      );
+
+      const resolvedSubjectIds = await resolveSubjectIdsWithCustomNames(
+        transaction,
+        {
+          subjectIds: input.subjectIds,
+          customSubjectNames: input.customSubjectNames
+        }
+      );
+
+      await Promise.all([
+        transaction.userSkill.deleteMany({ where: { userId } }),
+        transaction.userSubject.deleteMany({ where: { userId } }),
+        transaction.languageSkill.deleteMany({ where: { userId } })
+      ]);
+
+      if (resolvedSkillIds.length > 0) {
+        await transaction.userSkill.createMany({
+          data: resolvedSkillIds.map((skillId) => ({ userId, skillId }))
+        });
+      }
+
+      if (resolvedSubjectIds.length > 0) {
+        await transaction.userSubject.createMany({
+          data: resolvedSubjectIds.map((subjectId) => ({ userId, subjectId }))
+        });
+      }
+
+      if (input.languageSkills.length > 0) {
+        await transaction.languageSkill.createMany({
+          data: input.languageSkills.map((languageSkill) => ({
+            userId,
+            language: languageSkill.language,
+            level: languageSkill.level
+          }))
+        });
+      }
+    });
+
+    return { ok: true as const, matchingRelevantFieldsChanged: true };
+  },
+
+  async updateRolesSection(userId: string, rawInput: unknown) {
+    const input = rolesProfileInputSchema.parse(rawInput);
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, status: true, profile: { select: { id: true } } }
+    });
+
+    if (!currentUser) {
+      throw new Error("Пользователь не найден.");
+    }
+
+    if (currentUser.status === "BLOCKED" || currentUser.status === "DELETED") {
+      throw new Error("Профиль недоступен для редактирования.");
+    }
+
+    if (!currentUser.profile) {
+      throw new Error("Сначала заполните основные данные профиля.");
+    }
+
+    await prisma.profile.update({
+      where: { userId },
+      data: {
+        preferredRoles: input.preferredRoles
+      }
+    });
+
+    return { ok: true as const };
   },
 
   async deleteProfile(userId: string) {
