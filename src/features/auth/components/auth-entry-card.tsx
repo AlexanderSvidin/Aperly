@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
@@ -33,42 +33,23 @@ export function AuthEntryCard() {
   const router = useRouter();
   const telegram = useTelegramApp();
   const isDetecting = useTelegramDetecting();
+  const autoAuthAttemptedRef = useRef(false);
   const [error, setError] = useState<AuthErrorState | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // ------------------------------------------------------------------
-  // Loading skeleton — shown while we poll for window.Telegram.WebApp.
-  // This prevents Telegram's white loading overlay from appearing empty
-  // and ensures the button is never visible before WebApp.ready() has
-  // been called (which would leave touches blocked by the WebView).
-  // Both the SSR render and the first client render see isDetecting=true
-  // (the context default), so there is no hydration mismatch.
-  // ------------------------------------------------------------------
-  if (isDetecting) {
-    return (
-      <Card eyebrow="Быстрый вход" title="Начать">
-        <div className="screen-stack">
-          <p className="card-body-copy auth-card-loading-hint">
-            Инициализируем Telegram…
-          </p>
-          <div className="button button-primary button-full auth-card-loading-btn" aria-hidden="true" />
-        </div>
-      </Card>
-    );
-  }
-
-  // ------------------------------------------------------------------
-  // Resolved state — SDK detection is complete
-  // ------------------------------------------------------------------
   const canUseDevAuth = telegram.source === "dev";
   const canUseTelegramAuth = telegram.source === "telegram";
   const canAuthenticate = canUseTelegramAuth || canUseDevAuth;
 
   const primaryButtonLabel = canUseDevAuth
     ? "Войти в режиме разработки"
-    : "Продолжить через Telegram";
+    : "Откройте в Telegram";
 
-  function handleSubmit() {
+  const authenticate = useCallback(() => {
+    if (!canAuthenticate) {
+      return;
+    }
+
     startTransition(async () => {
       setError(null);
 
@@ -92,9 +73,10 @@ export function AuthEntryCard() {
         headers
       });
 
-      const payload = (await response.json().catch(() => null)) as
-        | { message?: string; redirectTo?: string }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        redirectTo?: string;
+      } | null;
 
       if (!response.ok) {
         if (payload?.redirectTo) {
@@ -113,21 +95,89 @@ export function AuthEntryCard() {
 
       window.location.assign(payload?.redirectTo ?? "/opportunities");
     });
+  }, [
+    canAuthenticate,
+    canUseDevAuth,
+    canUseTelegramAuth,
+    router,
+    telegram.initData
+  ]);
+
+  useEffect(() => {
+    if (isDetecting || !canUseTelegramAuth || autoAuthAttemptedRef.current) {
+      return;
+    }
+
+    autoAuthAttemptedRef.current = true;
+    authenticate();
+  }, [authenticate, canUseTelegramAuth, isDetecting]);
+
+  // ------------------------------------------------------------------
+  // Loading skeleton — shown while we poll for window.Telegram.WebApp.
+  // This prevents Telegram's white loading overlay from appearing empty
+  // and ensures the button is never visible before WebApp.ready() has
+  // been called (which would leave touches blocked by the WebView).
+  // Both the SSR render and the first client render see isDetecting=true
+  // (the context default), so there is no hydration mismatch.
+  // ------------------------------------------------------------------
+  if (isDetecting) {
+    return (
+      <Card eyebrow="Быстрый вход" title="Начать">
+        <div className="screen-stack">
+          <p className="card-body-copy auth-card-loading-hint">
+            Инициализируем Telegram…
+          </p>
+          <div
+            className="button button-primary button-full auth-card-loading-btn"
+            aria-hidden="true"
+          />
+        </div>
+      </Card>
+    );
+  }
+
+  if (canUseTelegramAuth) {
+    return (
+      <Card eyebrow="Вход" title="Открываем Aperly">
+        <div className="screen-stack">
+          <p className="card-body-copy">
+            Получаем Telegram-сессию и сразу переносим вас дальше.
+          </p>
+
+          {error ? <p className="error-text">{error.message}</p> : null}
+
+          {error ? (
+            <Button
+              fullWidth
+              disabled={isPending}
+              isLoading={isPending}
+              loadingLabel="Проверяем доступ..."
+              onClick={authenticate}
+              type="button"
+            >
+              Повторить
+            </Button>
+          ) : (
+            <div className="loading-spinner" aria-label="Вход" role="status">
+              <span className="loading-spinner-ring" aria-hidden="true" />
+            </div>
+          )}
+        </div>
+      </Card>
+    );
   }
 
   return (
     <Card eyebrow="Быстрый вход" title="Начать">
       <div className="screen-stack">
-        <p className="card-body-copy">
-          {getRuntimeHint(telegram.source)}
-        </p>
+        <p className="card-body-copy">{getRuntimeHint(telegram.source)}</p>
 
         {error ? <p className="error-text">{error.message}</p> : null}
 
         <Button
           fullWidth
           disabled={!canAuthenticate || isPending}
-          onClick={handleSubmit}
+          onClick={authenticate}
           type="button"
         >
           {isPending ? "Проверяем доступ…" : primaryButtonLabel}

@@ -760,6 +760,29 @@ test("request notes use private label copy", () => {
   assert.match(componentSource, /Видна только вам/);
 });
 
+test("Telegram launch starts authentication without a manual continue button", () => {
+  const componentSource = readFileSync(
+    new URL(
+      "../src/features/auth/components/auth-entry-card.tsx",
+      import.meta.url
+    ),
+    "utf8"
+  );
+  const welcomeSource = readFileSync(
+    new URL(
+      "../src/features/home/components/welcome-screen.tsx",
+      import.meta.url
+    ),
+    "utf8"
+  );
+
+  assert.match(componentSource, /autoAuthAttemptedRef/);
+  assert.match(componentSource, /authenticate\(\);/);
+  assert.doesNotMatch(componentSource, /Продолжить через Telegram/);
+  assert.match(welcomeSource, /TelegramLaunchScreen/);
+  assert.match(welcomeSource, /telegram\.source === "telegram"/);
+});
+
 test("buildHomeRequestItem summarizes StudyBuddy request data", () => {
   const item = buildHomeRequestItem(
     {

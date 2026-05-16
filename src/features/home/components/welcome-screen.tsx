@@ -1,5 +1,12 @@
+"use client";
+
+import { AperlyLogo } from "@/components/brand/aperly-logo";
 import { Card } from "@/components/ui/card";
 import { AuthEntryCard } from "@/features/auth/components/auth-entry-card";
+import {
+  useTelegramApp,
+  useTelegramDetecting
+} from "@/features/telegram/components/telegram-app-provider";
 
 const scenarios = [
   {
@@ -9,17 +16,39 @@ const scenarios = [
   },
   {
     title: "Проект / стартап / пет-проект",
-    description:
-      "Соберите участников под идею, стадию проекта и формат работы."
+    description: "Соберите участников под идею, стадию проекта и формат работы."
   },
   {
     title: "Совместная учёба",
-    description:
-      "Найдите партнёра по предмету, цели и удобному ритму занятий."
+    description: "Найдите партнёра по предмету, цели и удобному ритму занятий."
   }
 ];
 
+function TelegramLaunchScreen() {
+  return (
+    <section className="loading-screen">
+      <div className="loading-screen-inner">
+        <AperlyLogo size="xl" />
+        <p className="loading-status">Открываем Aperly в Telegram</p>
+        <div className="loading-spinner" aria-label="Вход" role="status">
+          <span className="loading-spinner-ring" aria-hidden="true" />
+        </div>
+      </div>
+      <div hidden>
+        <AuthEntryCard />
+      </div>
+    </section>
+  );
+}
+
 export function WelcomeScreen() {
+  const telegram = useTelegramApp();
+  const isDetecting = useTelegramDetecting();
+
+  if (isDetecting || telegram.source === "telegram") {
+    return <TelegramLaunchScreen />;
+  }
+
   return (
     <section className="welcome-layout">
       <div className="hero-panel">
