@@ -8,23 +8,37 @@ import {
   APP_SESSION_COOKIE_NAME,
   readAppSessionValue
 } from "@/server/services/auth/session-service";
+import {
+  isRecoverableSelfDeletedUser,
+  recoverSelfDeletedUserForOnboarding
+} from "@/server/services/auth/self-deleted-user-recovery";
 
 const sessionUserInclude = {
   profile: true
 };
 
 async function loadSessionUserById(userId: string) {
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: {
       id: userId
     },
     include: sessionUserInclude
   });
+
+  if (user && isRecoverableSelfDeletedUser(user)) {
+    return recoverSelfDeletedUserForOnboarding({
+      userId: user.id
+    });
+  }
+
+  return user;
 }
 
 export type SessionUser = Awaited<ReturnType<typeof loadSessionUserById>>;
 
-export function extractSessionCookieValue(cookieHeader: string | null | undefined) {
+export function extractSessionCookieValue(
+  cookieHeader: string | null | undefined
+) {
   return cookieHeader?.match(/aperly_session=([^;]+)/)?.[1];
 }
 
@@ -41,7 +55,9 @@ export const getCurrentSessionUser = cache(async () => {
   return loadSessionUserById(session.userId);
 });
 
-export async function getRequestSessionUser(cookieValue: string | null | undefined) {
+export async function getRequestSessionUser(
+  cookieValue: string | null | undefined
+) {
   const session = readAppSessionValue(cookieValue);
 
   if (!session) {
@@ -52,7 +68,9 @@ export async function getRequestSessionUser(cookieValue: string | null | undefin
 }
 
 export function serializeSessionUser(user: NonNullable<SessionUser>) {
-  const telegramIdentity = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  const telegramIdentity = [user.firstName, user.lastName]
+    .filter(Boolean)
+    .join(" ");
 
   return {
     id: user.id,
@@ -63,7 +81,9 @@ export function serializeSessionUser(user: NonNullable<SessionUser>) {
     lastName: user.lastName,
     username: user.username,
     onboardingCompleted: user.onboardingCompleted,
-    displayName: user.profile?.fullName ?? telegramIdentity,
+    displayName: user.deletedAt
+      ? telegramIdentity
+      : (user.profile?.fullName ?? telegramIdentity),
     hasProfile: Boolean(user.profile),
     isDiscoverable: user.profile?.isDiscoverable ?? false
   };

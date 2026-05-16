@@ -632,6 +632,9 @@ export const profileService = {
         data: {
           fullName: "Удалённый профиль",
           bio: null,
+          campus: null,
+          program: null,
+          courseYear: null,
           isDiscoverable: false,
           discoverableScenarios: [],
           telegramUsername: null,

@@ -1,6 +1,10 @@
 import { prisma } from "@/server/db/client";
 import { telegramServerEnv } from "@/lib/env/server";
 import { validateTelegramInitData } from "@/server/services/auth/telegram-init-data";
+import {
+  isRecoverableSelfDeletedUser,
+  recoverSelfDeletedUserForOnboarding
+} from "@/server/services/auth/self-deleted-user-recovery";
 
 type TelegramAuthBootstrap = {
   source: "telegram" | "dev" | "missing";
@@ -18,7 +22,9 @@ async function loadAuthenticatedUserByTelegramId(telegramId: bigint) {
   });
 }
 
-type AuthenticatedUser = Awaited<ReturnType<typeof loadAuthenticatedUserByTelegramId>>;
+type AuthenticatedUser = Awaited<
+  ReturnType<typeof loadAuthenticatedUserByTelegramId>
+>;
 
 export class TelegramAuthError extends Error {
   code: string;
@@ -78,13 +84,35 @@ async function persistIdentity(params: {
 }): Promise<NonNullable<AuthenticatedUser>> {
   const existingUser = await loadUserByTelegramId(params.telegramId);
 
-  if (existingUser?.status === "BLOCKED" || existingUser?.status === "DELETED") {
+  if (existingUser?.status === "BLOCKED") {
     throw new TelegramAuthError({
-      code: existingUser.status === "BLOCKED" ? "user_blocked" : "user_deleted",
-      message:
-        existingUser.status === "BLOCKED"
-          ? "Ваш доступ к Aperly ограничен."
-          : "Аккаунт удалён и не может быть восстановлен.",
+      code: "user_blocked",
+      message: "Ваш доступ к Aperly ограничен.",
+      status: 403,
+      redirectTo: blockedRedirectForStatus(existingUser.status)
+    });
+  }
+
+  if (existingUser?.status === "DELETED") {
+    if (isRecoverableSelfDeletedUser(existingUser)) {
+      const recoveredUser = await recoverSelfDeletedUserForOnboarding({
+        userId: existingUser.id,
+        telegramIdentity: {
+          firstName: params.firstName,
+          lastName: params.lastName,
+          username: params.username,
+          languageCode: params.languageCode
+        }
+      });
+
+      await ensureTelegramVerification(recoveredUser.id);
+
+      return recoveredUser;
+    }
+
+    throw new TelegramAuthError({
+      code: "user_deleted",
+      message: "Аккаунт удалён и не может быть восстановлен.",
       status: 403,
       redirectTo: blockedRedirectForStatus(existingUser.status)
     });
@@ -133,7 +161,9 @@ async function persistIdentity(params: {
 
 export interface TelegramAuthService {
   bootstrap(initData: string | null): Promise<TelegramAuthBootstrap>;
-  authenticateWithTelegram(initData: string): Promise<NonNullable<AuthenticatedUser>>;
+  authenticateWithTelegram(
+    initData: string
+  ): Promise<NonNullable<AuthenticatedUser>>;
   authenticateWithDevFallback(): Promise<NonNullable<AuthenticatedUser>>;
 }
 
@@ -165,7 +195,8 @@ export const telegramAuthService: TelegramAuthService = {
     } catch {
       throw new TelegramAuthError({
         code: "invalid_telegram_init_data",
-        message: "Telegram initData не прошёл проверку подписи. Откройте Aperly заново из Telegram.",
+        message:
+          "Telegram initData не прошёл проверку подписи. Откройте Aperly заново из Telegram.",
         status: 401
       });
     }
@@ -201,7 +232,10 @@ export const telegramAuthService: TelegramAuthService = {
       });
     }
 
-    if (telegramServerEnv.DEV_TELEGRAM_INIT_DATA && telegramServerEnv.TELEGRAM_BOT_TOKEN) {
+    if (
+      telegramServerEnv.DEV_TELEGRAM_INIT_DATA &&
+      telegramServerEnv.TELEGRAM_BOT_TOKEN
+    ) {
       const validated = validateTelegramInitData({
         botToken: telegramServerEnv.TELEGRAM_BOT_TOKEN,
         initData: telegramServerEnv.DEV_TELEGRAM_INIT_DATA,

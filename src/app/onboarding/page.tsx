@@ -23,7 +23,9 @@ export default async function OnboardingPage() {
     <main className="welcome-layout">
       <MinimalOnboardingForm
         defaultFullName={defaultFullName}
-        defaultInstitution={user.profile?.campus ?? undefined}
+        defaultInstitution={
+          user.deletedAt ? undefined : (user.profile?.campus ?? undefined)
+        }
       />
     </main>
   );

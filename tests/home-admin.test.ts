@@ -5,7 +5,13 @@ import { after, test } from "node:test";
 
 import { legacyChatDisabledPayload } from "@/app/api/_legacy-disabled";
 import { POST as legacyOpenChatPost } from "@/app/api/matches/[id]/open-chat/route";
+import { GET as getMe } from "@/app/api/me/route";
 import { prisma } from "@/server/db/client";
+import {
+  APP_SESSION_COOKIE_NAME,
+  createAppSessionValue
+} from "@/server/services/auth/session-service";
+import { recoverSelfDeletedUserForOnboarding } from "@/server/services/auth/self-deleted-user-recovery";
 import { validateTelegramInitData } from "@/server/services/auth/telegram-init-data";
 import { chatService } from "@/server/services/chat/chat-service";
 import type { RespondResult } from "@/features/chat/lib/chat-types";
@@ -712,6 +718,9 @@ test("self-deleted profile returns to onboarding and can be recreated", async ()
     assert.equal(deletedUser.onboardingCompleted, false);
     assert.ok(deletedUser.deletedAt);
     assert.equal(deletedUser.profile?.isDiscoverable, false);
+    assert.equal(deletedUser.profile?.campus, null);
+    assert.equal(deletedUser.profile?.program, null);
+    assert.equal(deletedUser.profile?.courseYear, null);
     assert.equal(
       await prisma.userSubject.count({
         where: {
@@ -742,6 +751,162 @@ test("self-deleted profile returns to onboarding and can be recreated", async ()
     assert.equal(restored.user.onboardingCompleted, true);
     assert.equal(restored.user.deletedAt, null);
     assert.equal(restored.user.profile?.fullName, "Restart Candidate");
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("legacy DELETED self-delete is recovered on the next session lookup", async () => {
+  const context = buildContext("legacy_deleted_session");
+
+  try {
+    const user = await createUser(context, {
+      firstName: "LegacyDeleted",
+      username: "legacy_deleted"
+    });
+    const subject = await createSubject(context);
+
+    await prisma.userSubject.create({
+      data: {
+        userId: user.id,
+        subjectId: subject.id
+      }
+    });
+    await prisma.availabilitySlot.create({
+      data: {
+        profileId: user.profile!.id,
+        dayOfWeek: "TUESDAY",
+        startMinute: 720,
+        endMinute: 780
+      }
+    });
+    await prisma.profile.update({
+      where: {
+        id: user.profile!.id
+      },
+      data: {
+        fullName: "Удалённый профиль",
+        campus: "HSE Perm",
+        program: "ba-international-business-economics",
+        courseYear: 3,
+        isDiscoverable: false,
+        discoverableScenarios: [],
+        telegramUsername: null
+      }
+    });
+    await prisma.user.update({
+      where: {
+        id: user.id
+      },
+      data: {
+        status: "DELETED",
+        onboardingCompleted: false,
+        firstName: "Удалённый",
+        lastName: null,
+        username: null,
+        deletedAt: new Date()
+      }
+    });
+
+    const response = await getMe(
+      new Request("http://aperly.test/api/me", {
+        headers: {
+          cookie: `${APP_SESSION_COOKIE_NAME}=${createAppSessionValue({
+            userId: user.id,
+            telegramId: user.telegramId.toString(),
+            role: user.role
+          })}`
+        }
+      })
+    );
+    const payload = (await response.json()) as {
+      authenticated: boolean;
+      user?: {
+        onboardingCompleted: boolean;
+        status: string;
+      };
+    };
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.authenticated, true);
+    assert.equal(payload.user?.status, "INACTIVE");
+    assert.equal(payload.user?.onboardingCompleted, false);
+
+    const recoveredUser = await prisma.user.findUniqueOrThrow({
+      where: {
+        id: user.id
+      },
+      include: {
+        profile: true
+      }
+    });
+
+    assert.equal(recoveredUser.status, "INACTIVE");
+    assert.equal(recoveredUser.onboardingCompleted, false);
+    assert.ok(recoveredUser.deletedAt);
+    assert.equal(recoveredUser.profile?.campus, null);
+    assert.equal(recoveredUser.profile?.program, null);
+    assert.equal(recoveredUser.profile?.courseYear, null);
+    assert.equal(
+      await prisma.userSubject.count({
+        where: {
+          userId: user.id
+        }
+      }),
+      0
+    );
+    assert.equal(
+      await prisma.availabilitySlot.count({
+        where: {
+          profileId: user.profile!.id
+        }
+      }),
+      0
+    );
+  } finally {
+    await cleanupContext(context);
+  }
+});
+
+test("legacy DELETED self-delete keeps fresh Telegram identity when recovered", async () => {
+  const context = buildContext("legacy_deleted_telegram_recovery");
+
+  try {
+    const user = await createUser(context, {
+      firstName: "LegacyTelegram",
+      username: "legacy_telegram"
+    });
+
+    await prisma.user.update({
+      where: {
+        id: user.id
+      },
+      data: {
+        status: "DELETED",
+        onboardingCompleted: false,
+        firstName: "Удалённый",
+        lastName: null,
+        username: null,
+        deletedAt: new Date()
+      }
+    });
+
+    const recovered = await recoverSelfDeletedUserForOnboarding({
+      userId: user.id,
+      telegramIdentity: {
+        firstName: "Telegram",
+        lastName: "Student",
+        username: "telegram_student",
+        languageCode: "ru"
+      }
+    });
+
+    assert.equal(recovered.status, "INACTIVE");
+    assert.equal(recovered.onboardingCompleted, false);
+    assert.equal(recovered.firstName, "Telegram");
+    assert.equal(recovered.lastName, "Student");
+    assert.equal(recovered.username, "telegram_student");
+    assert.equal(recovered.languageCode, "ru");
   } finally {
     await cleanupContext(context);
   }
