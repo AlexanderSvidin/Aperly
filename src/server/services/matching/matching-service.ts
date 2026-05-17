@@ -674,7 +674,13 @@ function buildRequestCard(request: MatchRequestRecord): SerializedMatchRequestCa
   return {
     id: request.id,
     scenario: request.scenario,
-    title: request.studyDetails?.subject?.name ?? "Совместная учёба",
+    title: (() => {
+      const subjectIds = getStudyRequestSubjectIds(request);
+      const total = subjectIds.length;
+      const primaryName = request.studyDetails?.subject?.name;
+      if (!primaryName) return "Совместная учёба";
+      return total > 1 ? `${primaryName} + ещё ${total - 1}` : primaryName;
+    })(),
     subtitle: `${
       studyFrequencyLabelByValue[
         (request.studyDetails?.desiredFrequency ?? "FLEXIBLE") as keyof typeof studyFrequencyLabelByValue

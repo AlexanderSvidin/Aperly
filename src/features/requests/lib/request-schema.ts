@@ -65,7 +65,7 @@ const baseRequestSchema = z.object({
 
 const caseRequestSchema = baseRequestSchema.extend({
   scenario: z.literal("CASE"),
-  availabilitySlots: z.array(availabilitySlotSchema).min(1).max(maxRequestAvailabilitySlots),
+  availabilitySlots: z.array(availabilitySlotSchema).max(maxRequestAvailabilitySlots).default([]),
   details: z.object({
     eventName: z.string().trim().min(2).max(240),
     deadline: z

@@ -659,7 +659,7 @@ export const requestService: RequestService = {
     if (!existingRequest) {
       throw new RequestDomainError({
         code: "request_not_found",
-        message: "Р—Р°РїСЂРѕСЃ РЅРµ РЅР°Р№РґРµРЅ.",
+        message: "Запрос не найден.",
         status: 404
       });
     }
@@ -667,7 +667,7 @@ export const requestService: RequestService = {
     if (existingRequest.status !== "ACTIVE") {
       throw new RequestDomainError({
         code: "request_not_pausable",
-        message: "РџРѕСЃС‚Р°РІРёС‚СЊ РЅР° РїР°СѓР·Сѓ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ Р°РєС‚РёРІРЅС‹Р№ Р·Р°РїСЂРѕСЃ.",
+        message: "Поставить на паузу можно только активный запрос.",
         status: 409
       });
     }
@@ -710,7 +710,7 @@ export const requestService: RequestService = {
     ) {
       throw new RequestDomainError({
         code: "request_not_resumable",
-        message: "Р’РѕР·РѕР±РЅРѕРІРёС‚СЊ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ Р·Р°РїСЂРѕСЃ РЅР° РїР°СѓР·Рµ.",
+        message: "Возобновить можно только запрос на паузе.",
         status: 409
       });
     }
@@ -745,7 +745,7 @@ export const requestService: RequestService = {
     if (!existingRequest) {
       throw new RequestDomainError({
         code: "request_not_found",
-        message: "Р—Р°РїСЂРѕСЃ РЅРµ РЅР°Р№РґРµРЅ.",
+        message: "Запрос не найден.",
         status: 404
       });
     }
@@ -763,7 +763,7 @@ export const requestService: RequestService = {
     ) {
       throw new RequestDomainError({
         code: "request_archived",
-        message: "РђСЂС…РёРІРЅС‹Р№ Р·Р°РїСЂРѕСЃ РЅРµР»СЊР·СЏ Р·Р°РєСЂС‹С‚СЊ.",
+        message: "Архивный или удалённый запрос нельзя закрыть.",
         status: 409
       });
     }

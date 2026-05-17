@@ -72,14 +72,14 @@ const allowedProgramIds = new Set(studyProgramOptions.map((program) => program.i
 
 export const onboardingProfileInputSchema = z
   .object({
-    fullName: z.string().trim().min(2).max(160),
-    institution: z.string().trim().min(2).max(160),
+    fullName: z.string().trim().min(2).max(240),
+    institution: z.string().trim().min(2).max(240),
     programType: z.enum(studyLevelValues),
-    direction: z.string().trim().min(2).max(160),
+    direction: z.string().trim().min(2).max(240),
     program: z
       .string()
       .trim()
-      .max(160)
+      .max(240)
       .optional()
       .nullable()
       .transform((value) => value || null),
@@ -108,8 +108,8 @@ export type OnboardingProfileInput = z.infer<
 
 export const profileInputSchema = z
   .object({
-    fullName: z.string().trim().min(2).max(160),
-    bio: z.string().trim().min(10).max(400),
+    fullName: z.string().trim().min(2).max(240),
+    bio: z.string().trim().max(1000).default(""),
     studyLevel: z.enum(studyLevelValues),
     programId: z
       .string()
@@ -121,11 +121,11 @@ export const profileInputSchema = z
     courseYear: z.number().int().min(1).max(4),
     skillIds: z.array(z.string().uuid()).max(MAX_PROFILE_SKILLS),
     customSkillNames: z
-      .array(z.string().trim().min(2).max(240))
+      .array(z.string().trim().min(1).max(240))
       .max(MAX_PROFILE_SKILLS),
     subjectIds: z.array(z.string().uuid()).max(MAX_PROFILE_SUBJECTS),
     customSubjectNames: z
-      .array(z.string().trim().min(2).max(240))
+      .array(z.string().trim().min(1).max(240))
       .max(MAX_PROFILE_SUBJECTS),
     languageSkills: z
       .array(
@@ -138,8 +138,8 @@ export const profileInputSchema = z
     preferredFormats: z.array(z.enum(formatValues)).min(1).max(formatValues.length),
     availabilitySlots: z
       .array(availabilitySlotSchema)
-      .min(1)
-      .max(MAX_AVAILABILITY_SLOTS),
+      .max(MAX_AVAILABILITY_SLOTS)
+      .default([]),
     isDiscoverable: z.boolean(),
     discoverableScenarios: z.array(z.enum(scenarioValues)).max(scenarioValues.length)
   })
@@ -302,14 +302,14 @@ const collaborationRoleValues = [
 
 export const basicProfileInputSchema = z
   .object({
-    fullName: z.string().trim().min(2).max(160),
-    institution: z.string().trim().min(2).max(160),
+    fullName: z.string().trim().min(2).max(240),
+    institution: z.string().trim().min(2).max(240),
     programType: z.enum(studyLevelValues),
-    direction: z.string().trim().min(2).max(160),
+    direction: z.string().trim().min(2).max(240),
     program: z
       .string()
       .trim()
-      .max(160)
+      .max(240)
       .optional()
       .nullable()
       .transform((value) => value || null),
@@ -338,11 +338,11 @@ export const skillsProfileInputSchema = z
   .object({
     skillIds: z.array(z.string().uuid()).max(MAX_PROFILE_SKILLS),
     customSkillNames: z
-      .array(z.string().trim().min(2).max(240))
+      .array(z.string().trim().min(1).max(240))
       .max(MAX_PROFILE_SKILLS),
     subjectIds: z.array(z.string().uuid()).max(MAX_PROFILE_SUBJECTS),
     customSubjectNames: z
-      .array(z.string().trim().min(2).max(240))
+      .array(z.string().trim().min(1).max(240))
       .max(MAX_PROFILE_SUBJECTS),
     languageSkills: z
       .array(
