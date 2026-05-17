@@ -23,6 +23,7 @@ import {
   requestStatusLabels,
   requestStatusTone
 } from "@/features/requests/lib/request-options";
+import { getUserErrorMessage } from "@/lib/ui/error-messages";
 import type { ActionState } from "@/lib/ui/action-state";
 import { idleActionState, isActionLoading } from "@/lib/ui/action-state";
 
@@ -39,7 +40,6 @@ type FeedbackState = {
 const formatLabelByValue = Object.fromEntries(
   formatOptions.map((option) => [option.value, option.label])
 ) as Record<(typeof formatOptions)[number]["value"], string>;
-const INTRO_MESSAGE_MAX_LENGTH = 500;
 
 function buildMatchesHref(
   requestId?: string | null,
@@ -163,6 +163,7 @@ export function MatchesScreenShell({
 
       const result = (await response.json().catch(() => null)) as
         | {
+            code?: string;
             message?: string;
             matchCount?: number;
             newMatchCount?: number;
@@ -171,8 +172,10 @@ export function MatchesScreenShell({
         | null;
 
       if (!response.ok) {
-        const message =
-          result?.message ?? "Не удалось обновить, попробуйте ещё раз.";
+        const message = getUserErrorMessage(
+          result,
+          "Не удалось обновить подборку. Попробуйте ещё раз."
+        );
         setActionStatus(actionKey, {
           status: "error",
           message
@@ -252,6 +255,7 @@ export function MatchesScreenShell({
 
       const result = (await response.json().catch(() => null)) as
         | {
+            code?: string;
             status?: "CHAT_READY" | "INVITE_SENT" | "RESPONSE_SENT";
             chatId?: string;
             interaction?: unknown;
@@ -260,8 +264,10 @@ export function MatchesScreenShell({
         | null;
 
       if (!response.ok || !result?.interaction) {
-        const message =
-          result?.message ?? "Не удалось перейти к следующему шагу по совпадению.";
+        const message = getUserErrorMessage(
+          result,
+          "Не удалось перейти к следующему шагу. Попробуйте ещё раз."
+        );
         setActionStatus(actionKey, {
           status: "error",
           message
@@ -322,6 +328,7 @@ export function MatchesScreenShell({
       });
       const result = (await response.json().catch(() => null)) as
         | {
+            code?: string;
             status?: "ACCEPTED" | "DECLINED";
             telegramUrl?: string | null;
             contactHint?: string;
@@ -330,7 +337,10 @@ export function MatchesScreenShell({
         | null;
 
       if (!response.ok || !result?.status) {
-        const message = result?.message ?? "Не удалось ответить на отклик.";
+        const message = getUserErrorMessage(
+          result,
+          "Не удалось ответить на отклик. Попробуйте ещё раз."
+        );
         setActionStatus(actionKey, {
           status: "error",
           message
@@ -681,14 +691,13 @@ export function MatchesScreenShell({
                 <span className="field-label">Отклик</span>
                 <textarea
                   className="field-textarea"
-                  maxLength={INTRO_MESSAGE_MAX_LENGTH}
                   onChange={(event) => setIntroMessage(event.target.value)}
                   placeholder="Коротко напишите, почему хотите присоединиться"
                   rows={4}
                   value={introMessage}
                 />
                 <span className="helper-text">
-                  {introMessage.trim().length}/{INTRO_MESSAGE_MAX_LENGTH}
+                  {introMessage.trim().length} символов
                 </span>
               </label>
             ) : null}

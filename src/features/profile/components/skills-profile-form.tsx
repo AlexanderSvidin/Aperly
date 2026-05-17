@@ -14,6 +14,10 @@ import {
   englishLevelOptions,
   type EnglishLevelId
 } from "@/features/study/lib/study-catalog";
+import {
+  getUserErrorMessage,
+  getUserIssueMessages
+} from "@/lib/ui/error-messages";
 
 type SkillLookupItem = {
   id: string;
@@ -47,6 +51,29 @@ type FeedbackState = {
 
 type PickerMode = "can" | "want" | "english" | null;
 
+const popularSkillTags = [
+  "SMM",
+  "Маркетинг",
+  "Финансы",
+  "Аналитика",
+  "Анализ данных",
+  "Разработка",
+  "Фронтенд",
+  "Бэкенд",
+  "Дизайн",
+  "UI-дизайн",
+  "UX-исследования",
+  "Продакт-менеджмент",
+  "Копирайтинг",
+  "Презентации",
+  "Продажи",
+  "PR",
+  "Операции",
+  "Право",
+  "HR",
+  "Ивент-менеджмент"
+];
+
 function extractIssueMessages(payload: unknown) {
   if (
     !payload ||
@@ -56,23 +83,26 @@ function extractIssueMessages(payload: unknown) {
   ) {
     return [];
   }
-  return payload.issues
-    .map((issue) => {
-      if (
-        issue &&
-        typeof issue === "object" &&
-        "message" in issue &&
-        typeof issue.message === "string"
-      ) {
-        return issue.message;
-      }
-      return null;
-    })
-    .filter(Boolean) as string[];
+  return getUserIssueMessages(payload.issues);
 }
 
 function normalize(value: string) {
-  return value.replace(/\s+/g, " ").trim();
+  const trimmed = value.replace(/\s+/g, " ").trim();
+  const popular = popularSkillTags.find(
+    (tag) => tag.toLowerCase() === trimmed.toLowerCase()
+  );
+
+  if (popular) {
+    return popular;
+  }
+
+  if (/^[a-zа-яё]{2,}$/i.test(trimmed)) {
+    return `${trimmed.slice(0, 1).toUpperCase()}${trimmed
+      .slice(1)
+      .toLowerCase()}`;
+  }
+
+  return trimmed;
 }
 
 export function SkillsProfileForm({
@@ -120,6 +150,32 @@ export function SkillsProfileForm({
       lookups.subjects.filter((subject) => !subject.slug.startsWith("custom-")),
     [lookups.subjects]
   );
+  const popularSkillOptions = useMemo(() => {
+    const presetSkillNames = new Set(
+      presetSkillOptions.map((skill) => skill.name.toLowerCase())
+    );
+
+    return popularSkillTags
+      .filter((name) => !presetSkillNames.has(name.toLowerCase()))
+      .map((name) => ({
+        id: `popular-skill:${name}`,
+        name,
+        slug: `popular-skill:${name.toLowerCase()}`
+      }));
+  }, [presetSkillOptions]);
+  const popularWantOptions = useMemo(() => {
+    const presetSubjectNames = new Set(
+      presetSubjectOptions.map((subject) => subject.name.toLowerCase())
+    );
+
+    return popularSkillTags
+      .filter((name) => !presetSubjectNames.has(name.toLowerCase()))
+      .map((name) => ({
+        id: `popular-want:${name}`,
+        name,
+        slug: `popular-want:${name.toLowerCase()}`
+      }));
+  }, [presetSubjectOptions]);
 
   const englishLevel = languageSkills.find(
     (skill) => skill.language === "ENGLISH"
@@ -222,8 +278,8 @@ export function SkillsProfileForm({
     });
   }
 
-  function addCustomSkill() {
-    const value = normalize(pickerCustom);
+  function addSkillByName(rawValue: string) {
+    const value = normalize(rawValue);
     if (!value) return;
     const existing = presetSkillOptions.find(
       (skill) => skill.name.toLowerCase() === value.toLowerCase()
@@ -238,11 +294,15 @@ export function SkillsProfileForm({
     ) {
       setCustomSkillNames([...customSkillNames, value]);
     }
+  }
+
+  function addCustomSkill() {
+    addSkillByName(pickerCustom);
     setPickerCustom("");
   }
 
-  function addCustomSubject() {
-    const value = normalize(pickerCustom);
+  function addSubjectByName(rawValue: string) {
+    const value = normalize(rawValue);
     if (!value) return;
     const existing = presetSubjectOptions.find(
       (subject) => subject.name.toLowerCase() === value.toLowerCase()
@@ -257,6 +317,10 @@ export function SkillsProfileForm({
     ) {
       setCustomSubjectNames([...customSubjectNames, value]);
     }
+  }
+
+  function addCustomSubject() {
+    addSubjectByName(pickerCustom);
     setPickerCustom("");
   }
 
@@ -293,13 +357,17 @@ export function SkillsProfileForm({
         })
       });
       const result = (await response.json().catch(() => null)) as {
+        code?: string;
         message?: string;
         issues?: unknown[];
       } | null;
       if (!response.ok) {
         setFeedback({
           kind: "error",
-          message: result?.message ?? "Не удалось сохранить.",
+          message: getUserErrorMessage(
+            result,
+            "Не удалось сохранить навыки. Попробуйте ещё раз."
+          ),
           issues: extractIssueMessages(result)
         });
         return;
@@ -308,16 +376,18 @@ export function SkillsProfileForm({
     });
   }
 
+  const skillPickerOptions = [...presetSkillOptions, ...popularSkillOptions];
+  const wantPickerOptions = [...presetSubjectOptions, ...popularWantOptions];
   const filteredPresetSkills = pickerSearch
-    ? presetSkillOptions.filter((skill) =>
+    ? skillPickerOptions.filter((skill) =>
         skill.name.toLowerCase().includes(pickerSearch.toLowerCase())
       )
-    : presetSkillOptions;
+    : skillPickerOptions;
   const filteredPresetSubjects = pickerSearch
-    ? presetSubjectOptions.filter((subject) =>
+    ? wantPickerOptions.filter((subject) =>
         subject.name.toLowerCase().includes(pickerSearch.toLowerCase())
       )
-    : presetSubjectOptions;
+    : wantPickerOptions;
 
   return (
     <section className="screen-stack">
@@ -501,19 +571,40 @@ export function SkillsProfileForm({
                   ).map((option) => {
                     const selected =
                       pickerMode === "can"
-                        ? skillIds.includes(option.id)
-                        : subjectIds.includes(option.id);
+                        ? option.id.startsWith("popular-skill:")
+                          ? customSkillNames.some(
+                              (name) =>
+                                name.toLowerCase() === option.name.toLowerCase()
+                            )
+                          : skillIds.includes(option.id)
+                        : option.id.startsWith("popular-want:")
+                          ? customSubjectNames.some(
+                              (name) =>
+                                name.toLowerCase() === option.name.toLowerCase()
+                            )
+                          : subjectIds.includes(option.id);
                     return (
                       <button
                         key={option.id}
                         type="button"
                         className="toggle-chip"
                         data-selected={selected}
-                        onClick={() =>
-                          pickerMode === "can"
-                            ? togglePresetSkill(option.id)
-                            : togglePresetSubject(option.id)
-                        }
+                        onClick={() => {
+                          if (pickerMode === "can") {
+                            if (option.id.startsWith("popular-skill:")) {
+                              addSkillByName(option.name);
+                            } else {
+                              togglePresetSkill(option.id);
+                            }
+                            return;
+                          }
+
+                          if (option.id.startsWith("popular-want:")) {
+                            addSubjectByName(option.name);
+                          } else {
+                            togglePresetSubject(option.id);
+                          }
+                        }}
                       >
                         {option.name}
                       </button>

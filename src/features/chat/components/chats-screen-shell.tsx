@@ -1333,7 +1333,6 @@ export function ChatsScreenShell({
                           <span className="field-label">Комментарий</span>
                           <textarea
                             className="field-input field-textarea"
-                            maxLength={500}
                             onChange={(event) =>
                               setStudyDraft((current) => ({
                                 ...current,
@@ -1414,7 +1413,6 @@ export function ChatsScreenShell({
                     <textarea
                       className="field-textarea chat-compose-input"
                       disabled={!isThreadWritable || isPending}
-                      maxLength={4000}
                       onChange={(event) => setComposerText(event.target.value)}
                       placeholder="Напишите, что вы ищете, как вам удобно работать и что хотите обсудить первым."
                       rows={4}

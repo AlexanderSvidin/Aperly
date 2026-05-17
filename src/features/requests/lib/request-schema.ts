@@ -60,14 +60,14 @@ const availabilitySlotSchema = z
 
 const baseRequestSchema = z.object({
   scenario: z.enum(scenarioValues),
-  notes: z.string().trim().max(600).optional().nullable()
+  notes: z.string().trim().optional().nullable()
 });
 
 const caseRequestSchema = baseRequestSchema.extend({
   scenario: z.literal("CASE"),
   availabilitySlots: z.array(availabilitySlotSchema).min(1).max(maxRequestAvailabilitySlots),
   details: z.object({
-    eventName: z.string().trim().min(2).max(160),
+    eventName: z.string().trim().min(2).max(240),
     deadline: z
       .string()
       .trim()
@@ -79,47 +79,98 @@ const caseRequestSchema = baseRequestSchema.extend({
       }),
     neededRoles: z
       .array(z.enum(collaborationRoleValues))
-      .min(1)
-      .max(collaborationRoleValues.length),
+      .default([]),
     teamGapSize: z.number().int().min(1).max(8),
     preferredFormat: z.enum(formatValues)
   })
+}).superRefine((value, context) => {
+  if (value.details.neededRoles.length === 0 && !value.notes?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["details", "neededRoles"],
+      message: "Добавьте хотя бы одну роль или короткий комментарий к запросу."
+    });
+  }
 });
 
 const projectRequestSchema = baseRequestSchema.extend({
   scenario: z.literal("PROJECT"),
   availabilitySlots: z.array(availabilitySlotSchema).max(maxRequestAvailabilitySlots).default([]),
   details: z.object({
-    projectTitle: z.string().trim().min(2).max(160),
-    shortDescription: z.string().trim().min(10).max(500),
+    projectTitle: z.string().trim().min(2).max(240),
+    shortDescription: z.string().trim().optional().default(""),
     stage: z.enum(projectStageValues),
     neededRoles: z
       .array(z.enum(collaborationRoleValues))
-      .min(1)
-      .max(collaborationRoleValues.length),
+      .default([]),
     expectedCommitment: z.enum(commitmentValues),
     preferredFormat: z.enum(formatValues)
   })
+}).superRefine((value, context) => {
+  if (
+    value.details.neededRoles.length === 0 &&
+    value.details.shortDescription.trim().length < 2 &&
+    !value.notes?.trim()
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["details", "neededRoles"],
+      message: "Добавьте хотя бы одну роль или коротко опишите, кто нужен."
+    });
+  }
 });
 
-const studyRequestSchema = baseRequestSchema.extend({
-  scenario: z.literal("STUDY"),
-  availabilitySlots: z.array(availabilitySlotSchema).max(maxRequestAvailabilitySlots).default([]),
-  details: z.object({
+const studyDetailsSchema = z
+  .object({
+    subjectIds: z.array(z.string().uuid()).optional().default([]),
+    customSubjectNames: z
+      .array(z.string().trim().min(2).max(240))
+      .optional()
+      .default([]),
     subjectId: z.string().uuid().optional().nullable(),
-    customSubjectName: z.string().trim().min(2).max(120).optional().nullable(),
-    currentContext: z.string().trim().min(10).max(500),
-    goal: z.string().trim().min(10).max(500),
+    customSubjectName: z.string().trim().min(2).max(240).optional().nullable(),
+    currentContext: z.string().trim().optional().default(""),
+    goal: z.string().trim().optional().default(""),
     desiredFrequency: z.enum(studyFrequencyValues),
     preferredTime: z.enum(preferredTimeValues),
     preferredFormat: z.enum(formatValues)
   })
+  .transform((details) => ({
+    ...details,
+    subjectIds: [
+      ...new Set([
+        ...details.subjectIds,
+        ...(details.subjectId ? [details.subjectId] : [])
+      ])
+    ],
+    customSubjectNames: [
+      ...new Set(
+        [
+          ...details.customSubjectNames,
+          ...(details.customSubjectName ? [details.customSubjectName] : [])
+        ].map((name) => name.replace(/\s+/g, " ").trim())
+      )
+    ].filter(Boolean)
+  }));
+
+const studyRequestSchema = baseRequestSchema.extend({
+  scenario: z.literal("STUDY"),
+  availabilitySlots: z.array(availabilitySlotSchema).max(maxRequestAvailabilitySlots).default([]),
+  details: studyDetailsSchema
 }).superRefine((value, context) => {
-  if (!value.details.subjectId && !value.details.customSubjectName?.trim()) {
+  const hasSubjects =
+    value.details.subjectIds.length > 0 ||
+    value.details.customSubjectNames.length > 0;
+  const hasComment =
+    Boolean(value.details.currentContext.trim()) ||
+    Boolean(value.details.goal.trim()) ||
+    Boolean(value.notes?.trim());
+
+  if (!hasSubjects && !hasComment) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ["details", "subjectId"],
-      message: "Выберите предмет или укажите свой вариант."
+      path: ["details", "subjectIds"],
+      message: "Выберите хотя бы один предмет или добавьте комментарий к учебному запросу."
     });
   }
 });
@@ -128,7 +179,7 @@ const activityRequestSchema = baseRequestSchema.extend({
   scenario: z.literal("ACTIVITY"),
   availabilitySlots: z.array(availabilitySlotSchema).max(maxRequestAvailabilitySlots).default([]),
   details: z.object({
-    title: z.string().trim().min(2).max(160),
+    title: z.string().trim().min(2).max(240),
     activitySubtype: z.enum(activitySubtypeValues),
     time: z
       .string()
@@ -140,10 +191,10 @@ const activityRequestSchema = baseRequestSchema.extend({
         message: "Дата активности некорректна."
       }),
     preferredFormat: z.enum(formatValues),
-    location: z.string().trim().max(160).optional().nullable(),
+    location: z.string().trim().max(240).optional().nullable(),
     peopleCount: z.number().int().min(1).max(50),
     recurrence: z.enum(studyFrequencyValues),
-    comment: z.string().trim().max(600).optional().nullable()
+    comment: z.string().trim().optional().nullable()
   })
 }).superRefine((value, context) => {
   if (!value.details.time && value.details.recurrence === "ONCE") {
@@ -227,6 +278,11 @@ export type SerializedRequest = {
         subjectId: string;
         subjectName: string;
         subjectSlug: string;
+        subjects: {
+          id: string;
+          name: string;
+          slug: string;
+        }[];
         currentContext: string;
         goal: string;
         desiredFrequency: (typeof studyFrequencyValues)[number];

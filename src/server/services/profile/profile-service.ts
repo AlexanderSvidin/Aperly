@@ -688,11 +688,41 @@ export const profileService = {
       await transaction.request.updateMany({
         where: {
           ownerId: userId,
-          status: "ACTIVE"
+          status: {
+            in: ["ACTIVE", "DRAFT"]
+          }
         },
         data: {
-          status: "DELETED",
+          status: "CLOSED",
           closedAt: now
+        }
+      });
+
+      await transaction.interaction.updateMany({
+        where: {
+          status: "PENDING",
+          OR: [
+            { senderUserId: userId },
+            { recipientUserId: userId },
+            {
+              sourceRequest: {
+                is: {
+                  ownerId: userId
+                }
+              }
+            },
+            {
+              targetRequest: {
+                is: {
+                  ownerId: userId
+                }
+              }
+            }
+          ]
+        },
+        data: {
+          status: "CANCELLED",
+          decidedAt: now
         }
       });
 

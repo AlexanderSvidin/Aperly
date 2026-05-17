@@ -72,6 +72,12 @@ async function loadRequestList(ownerId: string) {
 
 type UserRequestRecord = Awaited<ReturnType<typeof loadRequestList>>[number];
 
+type StudySubjectSummary = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 type RequestMutationClient = Pick<
   typeof prisma,
   | "availabilitySlot"
@@ -94,7 +100,87 @@ function buildDefaultExpiryDate(scenario: RequestInput["scenario"]) {
   return addDays(getDefaultExpiryDaysForScenario(scenario));
 }
 
-function serializeRequest(request: UserRequestRecord): SerializedRequest {
+function getStudySubjectIds(request: UserRequestRecord) {
+  if (!request.studyDetails) {
+    return [];
+  }
+
+  const subjectIds =
+    request.studyDetails.subjects.length > 0
+      ? request.studyDetails.subjects
+      : request.studyDetails.subjectId
+        ? [request.studyDetails.subjectId]
+        : [];
+
+  return [...new Set(subjectIds.filter(Boolean))];
+}
+
+async function buildSubjectMapForRequests(requests: UserRequestRecord[]) {
+  const subjectIds = [
+    ...new Set(requests.flatMap((request) => getStudySubjectIds(request)))
+  ];
+
+  if (subjectIds.length === 0) {
+    return new Map<string, StudySubjectSummary>();
+  }
+
+  const subjects = await prisma.subject.findMany({
+    where: {
+      id: {
+        in: subjectIds
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true
+    }
+  });
+
+  return new Map(subjects.map((subject) => [subject.id, subject]));
+}
+
+function buildStudySubjects(
+  request: UserRequestRecord,
+  subjectById: Map<string, StudySubjectSummary>
+) {
+  const fallbackSubject = request.studyDetails?.subject
+    ? {
+        id: request.studyDetails.subject.id,
+        name: request.studyDetails.subject.name,
+        slug: request.studyDetails.subject.slug
+      }
+    : null;
+  const subjects = getStudySubjectIds(request)
+    .map((subjectId) => subjectById.get(subjectId))
+    .filter(Boolean) as StudySubjectSummary[];
+
+  if (subjects.length > 0) {
+    return subjects;
+  }
+
+  return fallbackSubject ? [fallbackSubject] : [];
+}
+
+function serializeRequest(
+  request: UserRequestRecord,
+  subjectById = new Map<string, StudySubjectSummary>()
+): SerializedRequest {
+  const studySubjects = buildStudySubjects(request, subjectById);
+  const primaryStudySubject =
+    studySubjects[0] ??
+    (request.studyDetails?.subject
+      ? {
+          id: request.studyDetails.subject.id,
+          name: request.studyDetails.subject.name,
+          slug: request.studyDetails.subject.slug
+        }
+      : {
+          id: "",
+          name: "Совместная учёба",
+          slug: "study"
+        });
+
   return {
     id: request.id,
     scenario: request.scenario,
@@ -143,9 +229,10 @@ function serializeRequest(request: UserRequestRecord): SerializedRequest {
             }
         : {
             type: "STUDY",
-            subjectId: request.studyDetails!.subjectId,
-            subjectName: request.studyDetails!.subject.name,
-            subjectSlug: request.studyDetails!.subject.slug,
+            subjectId: primaryStudySubject.id,
+            subjectName: primaryStudySubject.name,
+            subjectSlug: primaryStudySubject.slug,
+            subjects: studySubjects,
             currentContext: request.studyDetails!.currentContext,
             goal: request.studyDetails!.goal,
             desiredFrequency: request.studyDetails!.desiredFrequency,
@@ -153,6 +240,12 @@ function serializeRequest(request: UserRequestRecord): SerializedRequest {
             preferredFormat: request.studyDetails!.preferredFormat
           }
   };
+}
+
+async function serializeRequestWithSubjects(request: UserRequestRecord) {
+  const subjectById = await buildSubjectMapForRequests([request]);
+
+  return serializeRequest(request, subjectById);
 }
 
 async function loadOwnedRequest(ownerId: string, requestId: string) {
@@ -304,34 +397,31 @@ async function replaceScenarioDetails(
   }
 
   const resolvedSubjectIds = await resolveSubjectIdsWithCustomNames(transaction, {
-    subjectIds: input.details.subjectId ? [input.details.subjectId] : [],
-    customSubjectNames: input.details.customSubjectName
-      ? [input.details.customSubjectName]
-      : []
+    subjectIds: input.details.subjectIds,
+    customSubjectNames: input.details.customSubjectNames
   });
 
-  const subjectId = resolvedSubjectIds[0];
+  const subjectId = resolvedSubjectIds[0] ?? null;
 
-  if (!subjectId) {
-    throw new Error("Выберите предмет для учебного запроса.");
-  }
-
-  const subjectCount = await transaction.subject.count({
-    where: {
-      id: {
-        in: [subjectId]
+  if (resolvedSubjectIds.length > 0) {
+    const subjectCount = await transaction.subject.count({
+      where: {
+        id: {
+          in: resolvedSubjectIds
+        }
       }
-    }
-  });
+    });
 
-  if (subjectCount !== 1) {
-    throw new Error("Предмет для совместной учёбы не найден.");
+    if (subjectCount !== resolvedSubjectIds.length) {
+      throw new Error("Предмет для совместной учёбы не найден.");
+    }
   }
 
   await transaction.studyRequestDetails.create({
     data: {
       requestId,
       subjectId,
+      subjects: resolvedSubjectIds,
       currentContext: input.details.currentContext,
       goal: input.details.goal,
       desiredFrequency: input.details.desiredFrequency,
@@ -363,9 +453,19 @@ async function buildRequestLookupPayload(ownerId: string) {
   ]);
 
   const normalizedProgramId = normalizeStoredProgramId(viewer?.profile?.program);
+  const subjectById = new Map(
+    subjects.map((subject) => [
+      subject.id,
+      {
+        id: subject.id,
+        name: subject.name,
+        slug: subject.slug
+      }
+    ])
+  );
 
   return {
-    requests: requests.map(serializeRequest),
+    requests: requests.map((request) => serializeRequest(request, subjectById)),
     subjects,
     studyDefaults: {
       studyLevel: getLevelForProgramId(normalizedProgramId),
@@ -447,7 +547,7 @@ export const requestService: RequestService = {
       });
     }
 
-    return serializeRequest(request);
+    return serializeRequestWithSubjects(request);
   },
 
   async create(actor, rawInput) {
@@ -481,7 +581,7 @@ export const requestService: RequestService = {
     await matchingService.recomputeForRequest(created.id);
 
     const refreshedRequest = await loadOwnedRequest(actor.id, created.id);
-    const serialized = serializeRequest(refreshedRequest ?? created);
+    const serialized = await serializeRequestWithSubjects(refreshedRequest ?? created);
     await trackRequestActionCompleted("create", actor.id, serialized);
 
     return serialized;
@@ -544,7 +644,7 @@ export const requestService: RequestService = {
     await matchingService.recomputeForRequest(updated.id);
 
     const refreshedRequest = await loadOwnedRequest(actor.id, updated.id);
-    const serialized = serializeRequest(refreshedRequest ?? updated);
+    const serialized = await serializeRequestWithSubjects(refreshedRequest ?? updated);
     await trackRequestActionCompleted("update", actor.id, serialized);
 
     return serialized;
@@ -584,7 +684,7 @@ export const requestService: RequestService = {
 
     await matchingService.recomputeForRequest(paused.id);
 
-    const serialized = serializeRequest(paused);
+    const serialized = await serializeRequestWithSubjects(paused);
     await trackRequestActionCompleted("pause", actor.id, serialized);
 
     return serialized;
@@ -630,7 +730,7 @@ export const requestService: RequestService = {
     await matchingService.recomputeForRequest(renewed.id);
 
     const refreshedRequest = await loadOwnedRequest(actor.id, renewed.id);
-    const serialized = serializeRequest(refreshedRequest ?? renewed);
+    const serialized = await serializeRequestWithSubjects(refreshedRequest ?? renewed);
     await trackRequestActionCompleted("renew", actor.id, serialized);
 
     return serialized;
@@ -651,7 +751,7 @@ export const requestService: RequestService = {
     }
 
     if (existingRequest.status === "CLOSED") {
-      const serialized = serializeRequest(existingRequest);
+      const serialized = await serializeRequestWithSubjects(existingRequest);
       await trackRequestActionCompleted("close", actor.id, serialized);
 
       return serialized;
@@ -681,7 +781,7 @@ export const requestService: RequestService = {
 
     await matchingService.recomputeForRequest(closed.id);
 
-    const serialized = serializeRequest(closed);
+    const serialized = await serializeRequestWithSubjects(closed);
     await trackRequestActionCompleted("close", actor.id, serialized);
 
     return serialized;
@@ -705,7 +805,7 @@ export const requestService: RequestService = {
       existingRequest.status === "ARCHIVED" ||
       existingRequest.status === "DELETED"
     ) {
-      const serialized = serializeRequest(existingRequest);
+      const serialized = await serializeRequestWithSubjects(existingRequest);
       await trackRequestActionCompleted("archive", actor.id, serialized);
 
       return serialized;
@@ -724,7 +824,7 @@ export const requestService: RequestService = {
 
     await matchingService.recomputeForRequest(archived.id);
 
-    const serialized = serializeRequest(archived);
+    const serialized = await serializeRequestWithSubjects(archived);
     await trackRequestActionCompleted("archive", actor.id, serialized);
 
     return serialized;

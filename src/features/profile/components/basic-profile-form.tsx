@@ -10,6 +10,10 @@ import {
   studyLevelOptions,
   type StudyLevelId
 } from "@/features/study/lib/study-catalog";
+import {
+  getUserErrorMessage,
+  getUserIssueMessages
+} from "@/lib/ui/error-messages";
 
 type BasicProfileFormProps = {
   defaultFullName: string;
@@ -25,30 +29,6 @@ type FeedbackState = {
   message: string;
   issues?: string[];
 };
-
-function extractIssueMessages(payload: unknown) {
-  if (
-    !payload ||
-    typeof payload !== "object" ||
-    !("issues" in payload) ||
-    !Array.isArray(payload.issues)
-  ) {
-    return [];
-  }
-  return payload.issues
-    .map((issue) => {
-      if (
-        issue &&
-        typeof issue === "object" &&
-        "message" in issue &&
-        typeof issue.message === "string"
-      ) {
-        return issue.message;
-      }
-      return null;
-    })
-    .filter(Boolean) as string[];
-}
 
 export function BasicProfileForm({
   defaultFullName,
@@ -120,6 +100,7 @@ export function BasicProfileForm({
         })
       });
       const result = (await response.json().catch(() => null)) as {
+        code?: string;
         message?: string;
         issues?: unknown[];
       } | null;
@@ -127,8 +108,11 @@ export function BasicProfileForm({
       if (!response.ok) {
         setFeedback({
           kind: "error",
-          message: result?.message ?? "Не удалось сохранить.",
-          issues: extractIssueMessages(result)
+          message: getUserErrorMessage(
+            result,
+            "Не удалось сохранить профиль. Попробуйте ещё раз."
+          ),
+          issues: getUserIssueMessages(result?.issues)
         });
         return;
       }

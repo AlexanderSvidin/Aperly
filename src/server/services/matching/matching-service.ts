@@ -534,8 +534,15 @@ function getRequestSkillNames(request: MatchRequestRecord) {
 function getRequestSubjectIds(request: MatchRequestRecord) {
   const ownerSubjects = request.owner.userSubjects.map((entry) => entry.subjectId);
 
-  if (request.scenario === "STUDY" && request.studyDetails?.subjectId) {
-    return toUniqueStrings([request.studyDetails.subjectId, ...ownerSubjects]);
+  if (request.scenario === "STUDY" && request.studyDetails) {
+    const studySubjects =
+      request.studyDetails.subjects.length > 0
+        ? request.studyDetails.subjects
+        : request.studyDetails.subjectId
+          ? [request.studyDetails.subjectId]
+          : [];
+
+    return toUniqueStrings([...studySubjects, ...ownerSubjects]);
   }
 
   return toUniqueStrings(ownerSubjects);
@@ -544,11 +551,37 @@ function getRequestSubjectIds(request: MatchRequestRecord) {
 function getRequestSubjectNames(request: MatchRequestRecord) {
   const ownerSubjects = request.owner.userSubjects.map((entry) => entry.subject.name);
 
-  if (request.scenario === "STUDY" && request.studyDetails?.subject.name) {
-    return toUniqueStrings([request.studyDetails.subject.name, ...ownerSubjects]);
+  if (request.scenario === "STUDY" && request.studyDetails) {
+    const studySubjectNames =
+      request.studyDetails.subjects.length > 1
+        ? request.studyDetails.subjects
+            .map((subjectId) =>
+              request.owner.userSubjects.find((entry) => entry.subjectId === subjectId)
+                ?.subject.name
+            )
+            .filter(Boolean)
+        : [];
+
+    return toUniqueStrings([
+      ...(studySubjectNames as string[]),
+      request.studyDetails.subject?.name,
+      ...ownerSubjects
+    ]);
   }
 
   return toUniqueStrings(ownerSubjects);
+}
+
+function getStudyRequestSubjectIds(request: MatchRequestRecord) {
+  if (!request.studyDetails) {
+    return [];
+  }
+
+  return request.studyDetails.subjects.length > 0
+    ? request.studyDetails.subjects
+    : request.studyDetails.subjectId
+      ? [request.studyDetails.subjectId]
+      : [];
 }
 
 function getRequestNeededRoles(request: MatchRequestRecord) {
@@ -641,7 +674,7 @@ function buildRequestCard(request: MatchRequestRecord): SerializedMatchRequestCa
   return {
     id: request.id,
     scenario: request.scenario,
-    title: request.studyDetails?.subject.name ?? "Совместная учёба",
+    title: request.studyDetails?.subject?.name ?? "Совместная учёба",
     subtitle: `${
       studyFrequencyLabelByValue[
         (request.studyDetails?.desiredFrequency ?? "FLEXIBLE") as keyof typeof studyFrequencyLabelByValue
@@ -991,8 +1024,10 @@ function scoreStudyRequestPair(
   source: MatchRequestRecord,
   candidate: MatchRequestRecord
 ) {
-  const subjectFit =
-    source.studyDetails?.subjectId === candidate.studyDetails?.subjectId ? 1 : 0;
+  const subjectFit = computeArrayOverlap(
+    getStudyRequestSubjectIds(source),
+    getStudyRequestSubjectIds(candidate)
+  );
   const goalFit = clampScore(
     (computeTextSimilarity(source.studyDetails?.goal, candidate.studyDetails?.goal) +
       computeTextSimilarity(
@@ -1135,11 +1170,11 @@ function scoreFallbackCandidate(
   });
 
   if (source.scenario === "STUDY") {
-    const subjectFit = source.studyDetails?.subjectId
-      ? candidateSubjects.includes(source.studyDetails.subjectId)
-        ? 1
-        : 0
-      : computeArrayOverlap(sourceSubjects, candidateSubjects);
+    const studySubjectIds = getStudyRequestSubjectIds(source);
+    const subjectFit =
+      studySubjectIds.length > 0
+        ? computeArrayOverlap(studySubjectIds, candidateSubjects)
+        : computeArrayOverlap(sourceSubjects, candidateSubjects);
 
     const drafts: MatchDimensionDraft[] = [
       {

@@ -61,8 +61,8 @@ export const dayOfWeekOptions = [
 
 export const courseYearOptions = [1, 2, 3, 4, 5, 6] as const;
 
-export const MAX_PROFILE_SKILLS = 6;
-export const MAX_PROFILE_SUBJECTS = 6;
+export const MAX_PROFILE_SKILLS = 50;
+export const MAX_PROFILE_SUBJECTS = 50;
 export const MAX_PROFILE_LANGUAGES = 1;
 export const MAX_AVAILABILITY_SLOTS = 6;
 

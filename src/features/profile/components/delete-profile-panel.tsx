@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { getUserErrorMessage } from "@/lib/ui/error-messages";
 
 type DeleteProfileResponse = {
   redirectTo?: string;
@@ -23,9 +24,15 @@ export function DeleteProfilePanel() {
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
+          code?: string;
           message?: string;
         } | null;
-        setErrorMessage(payload?.message ?? "Не удалось удалить профиль.");
+        setErrorMessage(
+          getUserErrorMessage(
+            payload,
+            "Не удалось удалить профиль. Попробуйте ещё раз."
+          )
+        );
         return;
       }
 

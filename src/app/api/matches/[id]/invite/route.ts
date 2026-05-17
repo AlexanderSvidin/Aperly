@@ -21,7 +21,7 @@ const inviteBodySchema = z.object({
   message: z
     .string()
     .trim()
-    .max(300)
+    .max(5000)
     .optional()
     .nullable()
     .transform((value) => value || "Привет! Мне интересно подключиться.")
@@ -64,7 +64,7 @@ export async function POST(request: Request, { params }: RouteProps) {
     if (!parsed.success) {
       return NextResponse.json(
         {
-          message: "Сообщение должно быть не длиннее 300 символов.",
+          message: "Сообщение слишком длинное. Сократите его и попробуйте ещё раз.",
           errors: parsed.error.flatten()
         },
         {

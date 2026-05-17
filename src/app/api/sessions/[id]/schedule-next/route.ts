@@ -18,7 +18,7 @@ type RouteProps = {
 const scheduleNextSchema = z.object({
   scheduledAt: z.string().datetime(),
   format: z.enum(["ONLINE", "OFFLINE", "HYBRID"]),
-  notes: z.string().max(500).optional()
+  notes: z.string().optional()
 });
 
 function buildErrorResponse(error: unknown) {

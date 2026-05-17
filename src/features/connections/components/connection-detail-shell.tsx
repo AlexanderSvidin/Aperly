@@ -10,6 +10,7 @@ import { scenarioLabelByValue } from "@/features/matching/lib/match-options";
 import type { SerializedConnectionDetail } from "@/features/connections/lib/connection-types";
 import type { ActionState } from "@/lib/ui/action-state";
 import { idleActionState, isActionLoading } from "@/lib/ui/action-state";
+import { getUserErrorMessage } from "@/lib/ui/error-messages";
 
 type ConnectionDetailShellProps = {
   connection: SerializedConnectionDetail;
@@ -41,13 +42,17 @@ export function ConnectionDetailShell({
         body: JSON.stringify({ action: "END" })
       });
       const payload = (await response.json().catch(() => null)) as {
+        code?: string;
         message?: string;
       } | null;
 
       if (!response.ok) {
         setActionState({
           status: "error",
-          message: payload?.message ?? "Не удалось завершить связь."
+          message: getUserErrorMessage(
+            payload,
+            "Не удалось завершить связь. Попробуйте ещё раз."
+          )
         });
         return;
       }

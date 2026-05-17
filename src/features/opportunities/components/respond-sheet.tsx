@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { getUserErrorMessage } from "@/lib/ui/error-messages";
 
-const RESPONSE_MESSAGE_MAX_LENGTH = 300;
 const DEFAULT_RESPONSE_MESSAGE = "Привет! Мне интересно подключиться.";
 
 const quickPhrases = [
@@ -53,7 +53,7 @@ export function RespondSheet({
     setMessage((current) => {
       const next = current.trim() ? `${current.trim()} ${phrase}` : phrase;
 
-      return next.slice(0, RESPONSE_MESSAGE_MAX_LENGTH);
+      return next;
     });
   }
 
@@ -86,6 +86,7 @@ export function RespondSheet({
       });
       const payload = (await response.json().catch(() => null)) as
         | {
+            code?: string;
             interaction?: unknown;
             message?: string;
           }
@@ -94,9 +95,10 @@ export function RespondSheet({
       if (!response.ok || !payload?.interaction) {
         setFeedback({
           kind: "error",
-          message:
-            payload?.message ??
+          message: getUserErrorMessage(
+            payload,
             "Не удалось отправить отклик. Попробуйте ещё раз."
+          )
         });
         return;
       }
@@ -135,14 +137,13 @@ export function RespondSheet({
           <span className="field-label">Сообщение</span>
           <textarea
             className="field-textarea"
-            maxLength={RESPONSE_MESSAGE_MAX_LENGTH}
             onChange={(event) => setMessage(event.target.value)}
             placeholder={DEFAULT_RESPONSE_MESSAGE}
             rows={4}
             value={message}
           />
           <span className="helper-text">
-            {trimmedMessage.length}/{RESPONSE_MESSAGE_MAX_LENGTH}
+            {trimmedMessage.length} символов
           </span>
         </label>
 

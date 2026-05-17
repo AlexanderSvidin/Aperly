@@ -29,7 +29,7 @@ import type {
 const STALE_THRESHOLD_MS = 72 * 60 * 60 * 1000;
 const CHAT_SOFT_LIMIT = 12;
 const MESSAGES_INITIAL_PAGE_SIZE = 50;
-const INTRO_MESSAGE_MAX_LENGTH = 500;
+const INTRO_MESSAGE_MAX_LENGTH = 5000;
 
 // ---------------------------------------------------------------------------
 // Prisma includes
@@ -355,6 +355,13 @@ function buildRevealedContacts(
     return null;
   }
   const other = getOtherUser(chat, userId);
+  if (other.status !== "ACTIVE" || other.deletedAt !== null) {
+    return {
+      telegramUsername: null,
+      phone: null
+    };
+  }
+
   return {
     telegramUsername: other.profile?.telegramUsername ?? null,
     phone: other.profile?.phone ?? null
@@ -1319,9 +1326,15 @@ export const chatService: ChatService = {
 
     // Load the other participant's profile for contact reveal.
     const otherUserId = isUserA ? chat!.userBId : chat!.userAId;
-    const otherProfile = await prisma.profile.findUnique({
-      where: { userId: otherUserId },
-      select: { telegramUsername: true, phone: true }
+    const otherUser = await prisma.user.findUnique({
+      where: { id: otherUserId },
+      select: {
+        status: true,
+        deletedAt: true,
+        profile: {
+          select: { telegramUsername: true, phone: true }
+        }
+      }
     });
 
     const scenario = chat!.match?.scenario;
@@ -1343,8 +1356,14 @@ export const chatService: ChatService = {
     return {
       status: "MUTUAL_CONSENT_REACHED" as const,
       revealedContacts: {
-        telegramUsername: otherProfile?.telegramUsername ?? null,
-        phone: otherProfile?.phone ?? null
+        telegramUsername:
+          otherUser?.status === "ACTIVE" && otherUser.deletedAt === null
+            ? otherUser.profile?.telegramUsername ?? null
+            : null,
+        phone:
+          otherUser?.status === "ACTIVE" && otherUser.deletedAt === null
+            ? otherUser.profile?.phone ?? null
+            : null
       }
     };
   }

@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { getUserErrorMessage } from "@/lib/ui/error-messages";
 
-const INVITE_MESSAGE_MAX_LENGTH = 300;
 const DEFAULT_INVITE_MESSAGE = "Привет! Мне интересно подключиться.";
 
 type InviteConfirmSheetProps = {
@@ -72,6 +72,7 @@ export function InviteConfirmSheet({
       });
       const payload = (await response.json().catch(() => null)) as
         | {
+            code?: string;
             interaction?: unknown;
             message?: string;
           }
@@ -80,9 +81,10 @@ export function InviteConfirmSheet({
       if (!response.ok || !payload?.interaction) {
         setFeedback({
           kind: "error",
-          message:
-            payload?.message ??
+          message: getUserErrorMessage(
+            payload,
             "Не удалось отправить приглашение. Попробуйте ещё раз."
+          )
         });
         return;
       }
@@ -123,14 +125,13 @@ export function InviteConfirmSheet({
           <span className="field-label">Сообщение</span>
           <textarea
             className="field-textarea"
-            maxLength={INVITE_MESSAGE_MAX_LENGTH}
             onChange={(event) => setMessage(event.target.value)}
             placeholder={DEFAULT_INVITE_MESSAGE}
             rows={4}
             value={message}
           />
           <span className="helper-text">
-            {trimmedMessage.length}/{INVITE_MESSAGE_MAX_LENGTH}
+            {trimmedMessage.length} символов
           </span>
         </label>
 

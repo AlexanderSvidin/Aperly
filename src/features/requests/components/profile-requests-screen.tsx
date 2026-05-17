@@ -17,6 +17,7 @@ import {
   studyFrequencyOptions
 } from "@/features/requests/lib/request-options";
 import type { SerializedRequest } from "@/features/requests/lib/request-schema";
+import { getUserErrorMessage } from "@/lib/ui/error-messages";
 
 type ProfileRequestsScreenProps = {
   initialRequests: SerializedRequest[];
@@ -59,7 +60,9 @@ function getRequestTitle(request: SerializedRequest) {
     return request.details.title;
   }
 
-  return request.details.subjectName;
+  return request.details.subjects.length > 0
+    ? request.details.subjects.map((subject) => subject.name).join(", ")
+    : request.details.subjectName;
 }
 
 function getRequestSubtitle(request: SerializedRequest) {
@@ -135,13 +138,19 @@ export function ProfileRequestsScreen({
       });
       const payload = (await response.json().catch(() => null)) as
         | {
+            code?: string;
             request?: SerializedRequest;
             message?: string;
           }
         | null;
 
       if (!response.ok || !payload?.request) {
-        setErrorMessage(payload?.message ?? "Не удалось закрыть запрос.");
+        setErrorMessage(
+          getUserErrorMessage(
+            payload,
+            "Не удалось закрыть запрос. Попробуйте ещё раз."
+          )
+        );
         return;
       }
 

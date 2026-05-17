@@ -27,6 +27,10 @@ import {
   type EnglishLevelId,
   type StudyLevelId
 } from "@/features/study/lib/study-catalog";
+import {
+  getUserErrorMessage,
+  getUserIssueMessages
+} from "@/lib/ui/error-messages";
 
 type SkillLookupItem = {
   id: string;
@@ -111,32 +115,6 @@ function toggleValue<T extends string>(values: T[], nextValue: T, maxItems: numb
 
 function normalizeCustomSkill(value: string) {
   return value.replace(/\s+/g, " ").trim();
-}
-
-function extractIssueMessages(payload: unknown) {
-  if (
-    !payload ||
-    typeof payload !== "object" ||
-    !("issues" in payload) ||
-    !Array.isArray(payload.issues)
-  ) {
-    return [];
-  }
-
-  return payload.issues
-    .map((issue) => {
-      if (
-        issue &&
-        typeof issue === "object" &&
-        "message" in issue &&
-        typeof issue.message === "string"
-      ) {
-        return issue.message;
-      }
-
-      return null;
-    })
-    .filter(Boolean) as string[];
 }
 
 export function ProfileForm({ initialValues, lookups, mode }: ProfileFormProps) {
@@ -352,6 +330,7 @@ export function ProfileForm({ initialValues, lookups, mode }: ProfileFormProps) 
 
       const result = (await response.json().catch(() => null)) as
         | {
+            code?: string;
             matchingRelevantFieldsChanged?: boolean;
             message?: string;
             issues?: unknown[];
@@ -361,8 +340,11 @@ export function ProfileForm({ initialValues, lookups, mode }: ProfileFormProps) 
       if (!response.ok) {
         setFeedback({
           kind: "error",
-          message: result?.message ?? "Не удалось сохранить профиль.",
-          issues: extractIssueMessages(result)
+          message: getUserErrorMessage(
+            result,
+            "Не удалось сохранить профиль. Попробуйте ещё раз."
+          ),
+          issues: getUserIssueMessages(result?.issues)
         });
         return;
       }

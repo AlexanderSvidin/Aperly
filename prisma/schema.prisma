@@ -291,7 +291,7 @@ model Verification {
 model Skill {
   id         String      @id @default(uuid()) @db.Uuid
   slug       String      @unique @db.VarChar(64)
-  name       String      @unique @db.VarChar(120)
+  name       String      @unique @db.VarChar(240)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   userSkills UserSkill[]
@@ -300,7 +300,7 @@ model Skill {
 model Subject {
   id            String              @id @default(uuid()) @db.Uuid
   slug          String              @unique @db.VarChar(64)
-  name          String              @db.VarChar(120)
+  name          String              @db.VarChar(240)
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   userSubjects  UserSubject[]
@@ -377,7 +377,7 @@ model Request {
 model CaseRequestDetails {
   id              String              @id @default(uuid()) @db.Uuid
   requestId       String              @unique @db.Uuid
-  eventName       String              @db.VarChar(160)
+  eventName       String              @db.VarChar(240)
   deadline        DateTime?
   neededRoles     CollaborationRole[] @default([])
   teamGapSize     Int
@@ -392,7 +392,7 @@ model CaseRequestDetails {
 model ProjectRequestDetails {
   id                 String              @id @default(uuid()) @db.Uuid
   requestId          String              @unique @db.Uuid
-  projectTitle       String              @db.VarChar(160)
+  projectTitle       String              @db.VarChar(240)
   shortDescription   String              @db.Text
   stage              ProjectStage
   neededRoles        CollaborationRole[] @default([])
@@ -408,7 +408,8 @@ model ProjectRequestDetails {
 model StudyRequestDetails {
   id               String           @id @default(uuid()) @db.Uuid
   requestId        String           @unique @db.Uuid
-  subjectId        String           @db.Uuid
+  subjectId        String?          @db.Uuid
+  subjects         String[]         @db.Uuid @default([])
   currentContext   String           @db.Text
   goal             String           @db.Text
   desiredFrequency StudyFrequency
@@ -417,7 +418,7 @@ model StudyRequestDetails {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   request          Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  subject          Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  subject          Subject?         @relation(fields: [subjectId], references: [id], onDelete: Restrict)
 
   @@index([subjectId, desiredFrequency])
 }
@@ -425,11 +426,11 @@ model StudyRequestDetails {
 model ActivityRequestDetails {
   id              String           @id @default(uuid()) @db.Uuid
   requestId       String           @unique @db.Uuid
-  title           String           @db.VarChar(160)
+  title           String           @db.VarChar(240)
   activitySubtype ActivitySubtype
   time            DateTime?
   preferredFormat FormatPreference
-  location        String?          @db.VarChar(160)
+  location        String?          @db.VarChar(240)
   peopleCount     Int
   recurrence      StudyFrequency
   comment         String?          @db.Text

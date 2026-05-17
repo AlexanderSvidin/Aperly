@@ -121,11 +121,11 @@ export const profileInputSchema = z
     courseYear: z.number().int().min(1).max(4),
     skillIds: z.array(z.string().uuid()).max(MAX_PROFILE_SKILLS),
     customSkillNames: z
-      .array(z.string().trim().min(2).max(120))
+      .array(z.string().trim().min(2).max(240))
       .max(MAX_PROFILE_SKILLS),
     subjectIds: z.array(z.string().uuid()).max(MAX_PROFILE_SUBJECTS),
     customSubjectNames: z
-      .array(z.string().trim().min(2).max(120))
+      .array(z.string().trim().min(2).max(240))
       .max(MAX_PROFILE_SUBJECTS),
     languageSkills: z
       .array(
@@ -238,12 +238,54 @@ export const profileInputSchema = z
 
 export type ProfileInput = z.infer<typeof profileInputSchema>;
 
+const popularTagNames = [
+  "SMM",
+  "Маркетинг",
+  "Финансы",
+  "Аналитика",
+  "Анализ данных",
+  "Разработка",
+  "Фронтенд",
+  "Бэкенд",
+  "Дизайн",
+  "UI-дизайн",
+  "UX-исследования",
+  "Продакт-менеджмент",
+  "Копирайтинг",
+  "Презентации",
+  "Продажи",
+  "PR",
+  "Операции",
+  "Право",
+  "HR",
+  "Ивент-менеджмент"
+];
+
+function normalizeTagName(value: string) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const popular = popularTagNames.find(
+    (tag) => tag.toLowerCase() === normalized.toLowerCase()
+  );
+
+  if (popular) {
+    return popular;
+  }
+
+  if (/^[a-zа-яё]{2,}$/i.test(normalized)) {
+    return `${normalized.slice(0, 1).toUpperCase()}${normalized
+      .slice(1)
+      .toLowerCase()}`;
+  }
+
+  return normalized;
+}
+
 function normalizeSubjectName(value: string) {
-  return value.replace(/\s+/g, " ").trim();
+  return normalizeTagName(value);
 }
 
 function normalizeSkillName(value: string) {
-  return value.replace(/\s+/g, " ").trim();
+  return normalizeTagName(value);
 }
 
 const collaborationRoleValues = [
@@ -296,11 +338,11 @@ export const skillsProfileInputSchema = z
   .object({
     skillIds: z.array(z.string().uuid()).max(MAX_PROFILE_SKILLS),
     customSkillNames: z
-      .array(z.string().trim().min(2).max(120))
+      .array(z.string().trim().min(2).max(240))
       .max(MAX_PROFILE_SKILLS),
     subjectIds: z.array(z.string().uuid()).max(MAX_PROFILE_SUBJECTS),
     customSubjectNames: z
-      .array(z.string().trim().min(2).max(120))
+      .array(z.string().trim().min(2).max(240))
       .max(MAX_PROFILE_SUBJECTS),
     languageSkills: z
       .array(

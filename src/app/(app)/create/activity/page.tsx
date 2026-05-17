@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { getUserErrorMessage } from "@/lib/ui/error-messages";
 
 const subtypeOptions = [
   { value: "CLUB", label: "Клуб" },
@@ -74,6 +75,7 @@ export default function CreateActivityPage() {
       })
     });
     const payload = (await response.json().catch(() => null)) as {
+      code?: string;
       request?: { id: string };
       message?: string;
     } | null;
@@ -81,7 +83,12 @@ export default function CreateActivityPage() {
     setIsSubmitting(false);
 
     if (!response.ok || !payload?.request?.id) {
-      setMessage(payload?.message ?? "Не удалось создать активность.");
+      setMessage(
+        getUserErrorMessage(
+          payload,
+          "Не удалось создать активность. Попробуйте ещё раз."
+        )
+      );
       return;
     }
 

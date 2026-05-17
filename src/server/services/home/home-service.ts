@@ -18,8 +18,6 @@ import {
 import { getProgramLabel } from "@/features/study/lib/study-catalog";
 import { prisma } from "@/server/db/client";
 
-const HOME_FEED_LIMIT = 30;
-
 const scenarioOrder: ScenarioType[] = ["STUDY", "PROJECT", "CASE", "ACTIVITY"];
 
 const collaborationRoleLabelByValue = Object.fromEntries(
@@ -79,6 +77,12 @@ type OpportunityRecord = Prisma.RequestGetPayload<{
   include: typeof opportunityInclude;
 }>;
 
+type SubjectSummary = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 export interface HomeService {
   getFeedForUser(
     userId: string,
@@ -126,7 +130,65 @@ function buildTimeLabel(request: OpportunityRecord) {
   return null;
 }
 
-function buildScenarioPayload(request: OpportunityRecord) {
+function getStudySubjects(
+  request: OpportunityRecord,
+  subjectById: Map<string, SubjectSummary>
+) {
+  const subjectIds =
+    request.studyDetails?.subjects && request.studyDetails.subjects.length > 0
+      ? request.studyDetails.subjects
+      : request.studyDetails?.subjectId
+        ? [request.studyDetails.subjectId]
+        : [];
+
+  const subjects = [...new Set(subjectIds)]
+    .map((subjectId) => subjectById.get(subjectId))
+    .filter(Boolean) as SubjectSummary[];
+
+  if (subjects.length > 0) {
+    return subjects;
+  }
+
+  return request.studyDetails?.subject ? [request.studyDetails.subject] : [];
+}
+
+async function buildSubjectMapForOpportunities(requests: OpportunityRecord[]) {
+  const subjectIds = [
+    ...new Set(
+      requests.flatMap((request) =>
+        request.studyDetails?.subjects && request.studyDetails.subjects.length > 0
+          ? request.studyDetails.subjects
+          : request.studyDetails?.subjectId
+            ? [request.studyDetails.subjectId]
+            : []
+      )
+    )
+  ];
+
+  if (subjectIds.length === 0) {
+    return new Map<string, SubjectSummary>();
+  }
+
+  const subjects = await prisma.subject.findMany({
+    where: {
+      id: {
+        in: subjectIds
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true
+    }
+  });
+
+  return new Map(subjects.map((subject) => [subject.id, subject]));
+}
+
+function buildScenarioPayload(
+  request: OpportunityRecord,
+  subjectById: Map<string, SubjectSummary>
+) {
   if (request.scenario === "CASE" && request.caseDetails) {
     const roles = request.caseDetails.neededRoles
       .slice(0, 2)
@@ -172,9 +234,14 @@ function buildScenarioPayload(request: OpportunityRecord) {
     studyFrequencyLabelByValue[
       request.studyDetails?.desiredFrequency ?? "FLEXIBLE"
     ] ?? "Гибко";
+  const studySubjects = getStudySubjects(request, subjectById);
+  const studySubjectTitle =
+    studySubjects.length > 0
+      ? studySubjects.map((subject) => subject.name).join(", ")
+      : "Совместная учёба";
 
   return {
-    title: request.studyDetails?.subject.name ?? "Совместная учёба",
+    title: studySubjectTitle,
     goal: request.studyDetails?.goal ?? "Ищут напарника для учёбы",
     meta: `${frequency} • ${request.studyDetails?.currentContext ?? "StudyBuddy"}`,
     format: request.studyDetails?.preferredFormat
@@ -205,6 +272,7 @@ function buildRelevanceReason(
 function serializeOpportunity(
   request: OpportunityRecord,
   viewerActiveRequestByScenario: Map<ScenarioType, string>,
+  subjectById: Map<string, SubjectSummary>,
   responseState: SerializedInteractionCtaState = {
     status: "NONE" as const,
     label: "Откликнуться",
@@ -213,7 +281,7 @@ function serializeOpportunity(
     connectionId: null
   }
 ): SerializedHomeOpportunity {
-  const scenarioPayload = buildScenarioPayload(request);
+  const scenarioPayload = buildScenarioPayload(request, subjectById);
   const authorName = buildPersonDisplayName({
     fullName: request.owner.profile?.fullName,
     firstName: request.owner.firstName,
@@ -298,43 +366,24 @@ export const homeService: HomeService = {
         owner: {
           status: "ACTIVE",
           blockedAt: null,
-          deletedAt: null,
-          profile: {
-            is: {
-              isDiscoverable: true,
-              discoverableScenarios:
-                selectedScenario === "ALL"
-                  ? {
-                      isEmpty: false
-                    }
-                  : {
-                      has: selectedScenario
-                    }
-            }
-          }
+          deletedAt: null
         }
       },
       include: opportunityInclude,
-      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-      take: HOME_FEED_LIMIT
+      orderBy: [{ createdAt: "desc" }]
     });
-
-    const filteredOpportunities =
-      selectedScenario === "ALL"
-        ? opportunities.filter((request) =>
-            request.owner.profile?.discoverableScenarios.includes(request.scenario)
-          )
-        : opportunities;
 
     const responseStateByRequest = await connectionService.getResponseStatesForRequests(
       userId,
-      filteredOpportunities.map((request) => request.id)
+      opportunities.map((request) => request.id)
     );
+    const subjectById = await buildSubjectMapForOpportunities(opportunities);
 
-    const serializedOpportunities = filteredOpportunities.map((request) =>
+    const serializedOpportunities = opportunities.map((request) =>
       serializeOpportunity(
         request,
         viewerActiveRequestByScenario,
+        subjectById,
         responseStateByRequest.get(request.id)
       )
     );

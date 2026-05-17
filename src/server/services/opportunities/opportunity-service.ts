@@ -44,6 +44,12 @@ type OpportunityDetailRecord = Prisma.RequestGetPayload<{
   include: typeof opportunityDetailInclude;
 }>;
 
+type SubjectSummary = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 const roleLabelByValue = Object.fromEntries(
   collaborationRoleOptions.map((option) => [option.value, option.label])
 ) as Record<(typeof collaborationRoleOptions)[number]["value"], string>;
@@ -76,7 +82,41 @@ function buildDisplayName(request: OpportunityDetailRecord) {
   );
 }
 
-function buildScenarioPayload(request: OpportunityDetailRecord) {
+async function loadStudySubjects(request: OpportunityDetailRecord) {
+  const subjectIds =
+    request.studyDetails?.subjects && request.studyDetails.subjects.length > 0
+      ? request.studyDetails.subjects
+      : request.studyDetails?.subjectId
+        ? [request.studyDetails.subjectId]
+        : [];
+
+  if (subjectIds.length === 0) {
+    return request.studyDetails?.subject ? [request.studyDetails.subject] : [];
+  }
+
+  const subjects = await prisma.subject.findMany({
+    where: {
+      id: {
+        in: [...new Set(subjectIds)]
+      }
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true
+    }
+  });
+  const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
+
+  return [...new Set(subjectIds)]
+    .map((subjectId) => subjectById.get(subjectId))
+    .filter(Boolean) as SubjectSummary[];
+}
+
+function buildScenarioPayload(
+  request: OpportunityDetailRecord,
+  studySubjects: SubjectSummary[] = []
+) {
   if (request.scenario === "CASE" && request.caseDetails) {
     const roles = request.caseDetails.neededRoles.map(
       (role) => roleLabelByValue[role] ?? role
@@ -118,7 +158,10 @@ function buildScenarioPayload(request: OpportunityDetailRecord) {
   }
 
   return {
-    title: request.studyDetails?.subject.name ?? "StudyBuddy",
+    title:
+      studySubjects.length > 0
+        ? studySubjects.map((subject) => subject.name).join(", ")
+        : request.studyDetails?.subject?.name ?? "StudyBuddy",
     goal: request.studyDetails?.goal ?? "Ищет партнёра для совместной учёбы.",
     meta: `${
       studyFrequencyLabelByValue[
@@ -135,7 +178,7 @@ function buildScenarioPayload(request: OpportunityDetailRecord) {
   };
 }
 
-function serializeOpportunityDetail(
+async function serializeOpportunityDetail(
   request: OpportunityDetailRecord,
   viewerUserId: string,
   responseState: SerializedInteractionCtaState = {
@@ -145,8 +188,8 @@ function serializeOpportunityDetail(
     interactionId: null,
     connectionId: null
   }
-): SerializedOpportunityDetail {
-  const payload = buildScenarioPayload(request);
+): Promise<SerializedOpportunityDetail> {
+  const payload = buildScenarioPayload(request, await loadStudySubjects(request));
   const isActive = request.status === "ACTIVE" && request.expiresAt > new Date();
 
   return {

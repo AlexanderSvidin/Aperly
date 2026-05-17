@@ -12,7 +12,7 @@ import { prisma } from "@/server/db/client";
 import { analyticsService } from "@/server/services/analytics/analytics-service";
 
 const DEFAULT_INTERACTION_MESSAGE = "Привет! Мне интересно подключиться.";
-const INTERACTION_MESSAGE_MAX_LENGTH = 300;
+const INTERACTION_MESSAGE_MAX_LENGTH = 5000;
 
 async function loadOtherProfile(userId: string) {
   const user = await prisma.user.findUnique({
@@ -96,6 +96,7 @@ const userNameSelect = {
   lastName: true,
   username: true,
   status: true,
+  deletedAt: true,
   profile: {
     select: {
       fullName: true,
@@ -298,7 +299,7 @@ function buildRequestTitle(
         scenario: ScenarioType;
         caseDetails: { eventName: string } | null;
         projectDetails: { projectTitle: string } | null;
-        studyDetails: { subject: { name: string }; goal?: string | null } | null;
+        studyDetails: { subject: { name: string } | null; goal?: string | null } | null;
       }
     | null
     | undefined
@@ -315,7 +316,7 @@ function buildRequestTitle(
     return request.projectDetails.projectTitle;
   }
 
-  return request.studyDetails?.subject.name ?? "StudyBuddy";
+  return request.studyDetails?.subject?.name ?? "StudyBuddy";
 }
 
 function buildInteractionTitle(interaction: InteractionRecord) {
@@ -435,8 +436,12 @@ function serializeConnection(
   revealActiveTelegram = false
 ): SerializedConnectionSummary {
   const otherUser = getOtherUserFromConnection(connection, userId);
+  const otherUserCanShareTelegram =
+    otherUser.status === "ACTIVE" && otherUser.deletedAt === null;
   const telegramUsername =
-    revealActiveTelegram && connection.status === "ACTIVE"
+    revealActiveTelegram &&
+    connection.status === "ACTIVE" &&
+    otherUserCanShareTelegram
       ? normalizeTelegramUsername(
           otherUser.profile?.telegramUsername ?? otherUser.username
         )

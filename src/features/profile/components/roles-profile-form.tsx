@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { collaborationRoleOptions } from "@/features/requests/lib/request-options";
+import { getUserErrorMessage } from "@/lib/ui/error-messages";
 
 type RoleValue = (typeof collaborationRoleOptions)[number]["value"];
 
@@ -65,12 +66,16 @@ export function RolesProfileForm({ initialRoles }: RolesProfileFormProps) {
         })
       });
       const result = (await response.json().catch(() => null)) as {
+        code?: string;
         message?: string;
       } | null;
       if (!response.ok) {
         setFeedback({
           kind: "error",
-          message: result?.message ?? "Не удалось сохранить."
+          message: getUserErrorMessage(
+            result,
+            "Не удалось сохранить роли. Попробуйте ещё раз."
+          )
         });
         return;
       }

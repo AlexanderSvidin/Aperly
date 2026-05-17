@@ -12,6 +12,7 @@ import {
   useTelegramDetecting
 } from "@/features/telegram/components/telegram-app-provider";
 import { TELEGRAM_INIT_DATA_HEADER } from "@/lib/telegram/constants";
+import { getUserErrorMessage } from "@/lib/ui/error-messages";
 
 type AuthErrorState = {
   message: string;
@@ -74,6 +75,7 @@ export function AuthEntryCard() {
       });
 
       const payload = (await response.json().catch(() => null)) as {
+        code?: string;
         message?: string;
         redirectTo?: string;
       } | null;
@@ -86,9 +88,10 @@ export function AuthEntryCard() {
         }
 
         setError({
-          message:
-            payload?.message ??
+          message: getUserErrorMessage(
+            payload,
             "Не удалось войти. Проверьте, что приложение открыто через Telegram."
+          )
         });
         return;
       }

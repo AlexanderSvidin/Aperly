@@ -12,6 +12,10 @@ import {
   studyLevelOptions,
   type StudyLevelId
 } from "@/features/study/lib/study-catalog";
+import {
+  getUserErrorMessage,
+  getUserIssueMessages
+} from "@/lib/ui/error-messages";
 
 type MinimalOnboardingFormProps = {
   defaultFullName: string;
@@ -23,32 +27,6 @@ type FeedbackState = {
   message: string;
   issues?: string[];
 };
-
-function extractIssueMessages(payload: unknown) {
-  if (
-    !payload ||
-    typeof payload !== "object" ||
-    !("issues" in payload) ||
-    !Array.isArray(payload.issues)
-  ) {
-    return [];
-  }
-
-  return payload.issues
-    .map((issue) => {
-      if (
-        issue &&
-        typeof issue === "object" &&
-        "message" in issue &&
-        typeof issue.message === "string"
-      ) {
-        return issue.message;
-      }
-
-      return null;
-    })
-    .filter(Boolean) as string[];
-}
 
 export function MinimalOnboardingForm({
   defaultFullName,
@@ -118,6 +96,7 @@ export function MinimalOnboardingForm({
       });
       const result = (await response.json().catch(() => null)) as
         | {
+            code?: string;
             message?: string;
             issues?: unknown[];
           }
@@ -126,8 +105,11 @@ export function MinimalOnboardingForm({
       if (!response.ok) {
         setFeedback({
           kind: "error",
-          message: result?.message ?? "Не удалось сохранить профиль.",
-          issues: extractIssueMessages(result)
+          message: getUserErrorMessage(
+            result,
+            "Не удалось сохранить профиль. Попробуйте ещё раз."
+          ),
+          issues: getUserIssueMessages(result?.issues)
         });
         return;
       }

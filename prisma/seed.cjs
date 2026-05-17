@@ -11,11 +11,22 @@ const skillSeeds = [
   { slug: "product",      name: "Управление продуктом" },
   { slug: "design",       name: "Дизайн" },
   { slug: "marketing",    name: "Маркетинг" },
+  { slug: "smm",          name: "SMM" },
+  { slug: "sales",        name: "Продажи" },
   { slug: "finance",      name: "Финансы" },
+  { slug: "data-analysis", name: "Анализ данных" },
+  { slug: "excel",        name: "Excel" },
   { slug: "frontend",     name: "Фронтенд" },
   { slug: "backend",      name: "Бэкенд разработка" },
+  { slug: "mobile",       name: "Мобильная разработка" },
   { slug: "ux",           name: "Исследование пользователей" },
-  { slug: "copywriting",  name: "Тексты" }
+  { slug: "ui",           name: "UI-дизайн" },
+  { slug: "copywriting",  name: "Копирайтинг" },
+  { slug: "pr",           name: "PR" },
+  { slug: "operations",   name: "Операции" },
+  { slug: "legal",        name: "Право" },
+  { slug: "hr",           name: "HR" },
+  { slug: "event-management", name: "Ивент-менеджмент" }
 ];
 
 const subjectSeeds = [

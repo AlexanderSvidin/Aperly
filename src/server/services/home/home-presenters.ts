@@ -41,7 +41,9 @@ export function buildHomeRequestTitle(request: SerializedRequest) {
     return request.details.title;
   }
 
-  return request.details.subjectName;
+  return request.details.subjects.length > 0
+    ? request.details.subjects.map((subject) => subject.name).join(", ")
+    : request.details.subjectName;
 }
 
 export function buildHomeRequestSubtitle(request: SerializedRequest) {

@@ -16,6 +16,7 @@ import { formatOptions } from "@/features/profile/lib/profile-options";
 import type { SerializedInteractionDetail } from "@/features/connections/lib/connection-types";
 import type { ActionState } from "@/lib/ui/action-state";
 import { idleActionState, isActionLoading } from "@/lib/ui/action-state";
+import { getUserErrorMessage } from "@/lib/ui/error-messages";
 
 type IncomingInteractionShellProps = {
   interaction: SerializedInteractionDetail;
@@ -65,6 +66,7 @@ export function IncomingInteractionShell({
       );
       const payload = (await response.json().catch(() => null)) as
         | {
+            code?: string;
             connection?: { id: string } | null;
             message?: string;
           }
@@ -73,7 +75,10 @@ export function IncomingInteractionShell({
       if (!response.ok) {
         setActionState({
           status: "error",
-          message: payload?.message ?? "Не удалось ответить на входящее."
+          message: getUserErrorMessage(
+            payload,
+            "Не удалось ответить на входящее. Попробуйте ещё раз."
+          )
         });
         return;
       }

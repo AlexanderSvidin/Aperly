@@ -23,7 +23,7 @@ const sessionActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("RESCHEDULE"),
     scheduledAt: z.string().datetime(),
-    notes: z.string().max(500).optional()
+    notes: z.string().optional()
   })
 ]);
 

@@ -34,6 +34,10 @@ import { StudySubjectPicker } from "@/features/study/components/study-subject-pi
 import { type StudyLevelId } from "@/features/study/lib/study-catalog";
 import type { ActionState } from "@/lib/ui/action-state";
 import { idleActionState, isActionLoading } from "@/lib/ui/action-state";
+import {
+  getUserErrorMessage,
+  getUserIssueMessages
+} from "@/lib/ui/error-messages";
 
 type SubjectOption = {
   id: string;
@@ -111,8 +115,8 @@ type StudyDraft = {
   scenario: "STUDY";
   notes: string;
   details: {
-    subjectId: string;
-    customSubjectName: string;
+    subjectIds: string[];
+    customSubjectNames: string[];
     currentContext: string;
     goal: string;
     desiredFrequency: (typeof studyFrequencyOptions)[number]["value"];
@@ -188,8 +192,8 @@ function createDefaultDraft(
     scenario,
     notes: "",
     details: {
-      subjectId: subjects[0]?.id ?? "",
-      customSubjectName: "",
+      subjectIds: [],
+      customSubjectNames: [],
       currentContext: "",
       goal: "",
       desiredFrequency: "WEEKLY",
@@ -256,8 +260,11 @@ function createDraftFromRequest(request: SerializedRequest): RequestDraft {
     scenario: "STUDY",
     notes: request.notes ?? "",
     details: {
-      subjectId: request.details.subjectId,
-      customSubjectName: "",
+      subjectIds:
+        request.details.subjects.length > 0
+          ? request.details.subjects.map((subject) => subject.id)
+          : [request.details.subjectId].filter(Boolean),
+      customSubjectNames: [],
       currentContext: request.details.currentContext,
       goal: request.details.goal,
       desiredFrequency: request.details.desiredFrequency,
@@ -285,20 +292,7 @@ function extractIssueMessages(payload: unknown) {
     return [];
   }
 
-  return payload.issues
-    .map((issue) => {
-      if (
-        issue &&
-        typeof issue === "object" &&
-        "message" in issue &&
-        typeof issue.message === "string"
-      ) {
-        return issue.message;
-      }
-
-      return null;
-    })
-    .filter(Boolean) as string[];
+  return getUserIssueMessages(payload.issues);
 }
 
 function summarizeRequest(request: SerializedRequest) {
@@ -314,7 +308,9 @@ function summarizeRequest(request: SerializedRequest) {
     return request.details.title;
   }
 
-  return request.details.subjectName;
+  return request.details.subjects.length > 0
+    ? request.details.subjects.map((subject) => subject.name).join(", ")
+    : request.details.subjectName;
 }
 
 function findOptionLabel(
@@ -672,8 +668,8 @@ export function RequestComposerShell({
                 notes: draft.notes,
                 availabilitySlots: [],
                 details: {
-                  subjectId: draft.details.subjectId || null,
-                  customSubjectName: draft.details.customSubjectName || null,
+                  subjectIds: draft.details.subjectIds,
+                  customSubjectNames: draft.details.customSubjectNames,
                   currentContext: draft.details.currentContext,
                   goal: draft.details.goal,
                   desiredFrequency: draft.details.desiredFrequency,
@@ -691,6 +687,7 @@ export function RequestComposerShell({
       );
 
       const result = (await response.json().catch(() => null)) as {
+        code?: string;
         request?: SerializedRequest;
         message?: string;
         issues?: unknown[];
@@ -700,7 +697,10 @@ export function RequestComposerShell({
       } | null;
 
       if (!response.ok || !result?.request) {
-        const message = result?.message ?? "Не удалось сохранить запрос.";
+        const message = getUserErrorMessage(
+          result,
+          "Не удалось сохранить запрос. Попробуйте ещё раз."
+        );
         setActionStatus(actionKey, {
           status: "error",
           message
@@ -764,12 +764,16 @@ export function RequestComposerShell({
         "POST"
       );
       const result = (await response.json().catch(() => null)) as {
+        code?: string;
         request?: SerializedRequest;
         message?: string;
       } | null;
 
       if (!response.ok || !result?.request) {
-        const message = result?.message ?? "Не удалось архивировать запрос.";
+        const message = getUserErrorMessage(
+          result,
+          "Не удалось архивировать запрос. Попробуйте ещё раз."
+        );
         setActionStatus(actionKey, {
           status: "error",
           message
@@ -820,13 +824,16 @@ export function RequestComposerShell({
         "POST"
       );
       const result = (await response.json().catch(() => null)) as {
+        code?: string;
         request?: SerializedRequest;
         message?: string;
       } | null;
 
       if (!response.ok || !result?.request) {
-        const message =
-          result?.message ?? "Не удалось поставить запрос на паузу.";
+        const message = getUserErrorMessage(
+          result,
+          "Не удалось поставить запрос на паузу. Попробуйте ещё раз."
+        );
         setActionStatus(actionKey, {
           status: "error",
           message
@@ -885,12 +892,16 @@ export function RequestComposerShell({
         "POST"
       );
       const result = (await response.json().catch(() => null)) as {
+        code?: string;
         request?: SerializedRequest;
         message?: string;
       } | null;
 
       if (!response.ok || !result?.request) {
-        const message = result?.message ?? "Не удалось закрыть запрос.";
+        const message = getUserErrorMessage(
+          result,
+          "Не удалось закрыть запрос. Попробуйте ещё раз."
+        );
         setActionStatus(actionKey, {
           status: "error",
           message
@@ -941,12 +952,16 @@ export function RequestComposerShell({
         "POST"
       );
       const result = (await response.json().catch(() => null)) as {
+        code?: string;
         request?: SerializedRequest;
         message?: string;
       } | null;
 
       if (!response.ok || !result?.request) {
-        const message = result?.message ?? "Не удалось обновить запрос.";
+        const message = getUserErrorMessage(
+          result,
+          "Не удалось обновить запрос. Попробуйте ещё раз."
+        );
         setActionStatus(actionKey, {
           status: "error",
           message
@@ -1430,7 +1445,6 @@ export function RequestComposerShell({
                     })
                   }
                   placeholder="Что вы делаете и какие люди нужны сейчас"
-                  required
                   rows={4}
                   value={draft.details.shortDescription}
                 />
@@ -1547,8 +1561,8 @@ export function RequestComposerShell({
             <>
               <StudySubjectPicker
                 courseYear={studyCourseYear}
-                maxSelection={1}
-                mode="single"
+                maxSelection={50}
+                mode="multiple"
                 onCourseYearChange={setStudyCourseYear}
                 onProgramIdChange={setStudyProgramId}
                 onSelectedCustomSubjectsChange={(values) =>
@@ -1561,11 +1575,7 @@ export function RequestComposerShell({
                       ...currentDraft,
                       details: {
                         ...currentDraft.details,
-                        customSubjectName: values[0] ?? "",
-                        subjectId:
-                          values.length > 0
-                            ? ""
-                            : currentDraft.details.subjectId
+                        customSubjectNames: values
                       }
                     };
                   })
@@ -1580,25 +1590,15 @@ export function RequestComposerShell({
                       ...currentDraft,
                       details: {
                         ...currentDraft.details,
-                        subjectId: values[0] ?? "",
-                        customSubjectName:
-                          values.length > 0
-                            ? ""
-                            : currentDraft.details.customSubjectName
+                        subjectIds: values
                       }
                     };
                   })
                 }
                 onStudyLevelChange={setStudyLevel}
                 programId={studyProgramId}
-                selectedCustomSubjects={
-                  draft.details.customSubjectName
-                    ? [draft.details.customSubjectName]
-                    : []
-                }
-                selectedSubjectIds={
-                  draft.details.subjectId ? [draft.details.subjectId] : []
-                }
+                selectedCustomSubjects={draft.details.customSubjectNames}
+                selectedSubjectIds={draft.details.subjectIds}
                 studyLevel={studyLevel}
                 subjects={subjects}
               />
@@ -1617,7 +1617,6 @@ export function RequestComposerShell({
                     })
                   }
                   placeholder="С чем вы разбираетесь или где нужна помощь"
-                  required
                   rows={4}
                   value={draft.details.currentContext}
                 />
@@ -1637,7 +1636,6 @@ export function RequestComposerShell({
                     })
                   }
                   placeholder="Какой результат хотите получить от совместной учёбы"
-                  required
                   rows={4}
                   value={draft.details.goal}
                 />
