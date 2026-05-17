@@ -185,7 +185,7 @@ function buildRequestTitle(request: RequestRecord | ReportRecord["request"] | Ac
     return request.projectDetails.projectTitle;
   }
 
-  return request.studyDetails?.subject.name ?? "StudyBuddy";
+  return request.studyDetails?.subject?.name ?? "StudyBuddy";
 }
 
 function buildReportContextLabel(report: ReportRecord) {

@@ -1357,12 +1357,12 @@ export const chatService: ChatService = {
       status: "MUTUAL_CONSENT_REACHED" as const,
       revealedContacts: {
         telegramUsername:
-          otherUser?.status === "ACTIVE" && otherUser.deletedAt === null
-            ? otherUser.profile?.telegramUsername ?? null
+          otherUser?.status === "ACTIVE" && otherUser?.deletedAt === null
+            ? (otherUser?.profile?.telegramUsername ?? null)
             : null,
         phone:
-          otherUser?.status === "ACTIVE" && otherUser.deletedAt === null
-            ? otherUser.profile?.phone ?? null
+          otherUser?.status === "ACTIVE" && otherUser?.deletedAt === null
+            ? (otherUser?.profile?.phone ?? null)
             : null
       }
     };

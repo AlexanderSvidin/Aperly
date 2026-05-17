@@ -265,9 +265,9 @@ function getStudySubjectName(session: HomeSessionRecord, userId: string) {
   const ownedRequest = getOwnedStudyRequestForUser(session, userId);
 
   return (
-    ownedRequest?.studyDetails?.subject.name ||
-    session.match.sourceRequest.studyDetails?.subject.name ||
-    session.match.candidateRequest?.studyDetails?.subject.name ||
+    ownedRequest?.studyDetails?.subject?.name ||
+    session.match.sourceRequest.studyDetails?.subject?.name ||
+    session.match.candidateRequest?.studyDetails?.subject?.name ||
     "StudyBuddy"
   );
 }
@@ -362,9 +362,9 @@ function serializeStudyChatPanel(
     (ownedRequest?.status as SerializedStudyChatPanel["requestStatus"]) ?? null;
   const otherUser = chat.userAId === userId ? chat.userB : chat.userA;
   const subjectName =
-    ownedRequest?.studyDetails?.subject.name ||
-    chat.match.sourceRequest.studyDetails?.subject.name ||
-    chat.match.candidateRequest?.studyDetails?.subject.name ||
+    ownedRequest?.studyDetails?.subject?.name ||
+    chat.match.sourceRequest.studyDetails?.subject?.name ||
+    chat.match.candidateRequest?.studyDetails?.subject?.name ||
     "StudyBuddy";
 
   return {
